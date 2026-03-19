@@ -1,0 +1,1716 @@
+---
+title: "Pregunta 6"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    keep_tex: false
+header-includes:
+  - \pagenumbering{gobble}
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{float}
+  - \usepackage{caption}
+  - \usepackage{fontspec}
+  - \setmainfont{Arial}
+---
+
+Para la correcta replicación de este trabajo solo se necesitan descargar las bases originales de INEGI correspondientes a la ENFIH 2019. Sin embargo, se recomienda renombrar dichas bases de datos con las dos primeras letras en mayúsculas.
+Por ejemplo:
+"THogar.csv"
+Asimismo, igualmente es necesario modificar la línea 46 correspondiente al escritorio de trabajo, poniendo la carpeta donde se encuentren sus bases de datos.
+El resto del código debería correr sin ninguna otra modificación mayor.
+
+## 6. Estudie el nivel de riqueza neta de los hogares de acuerdo a la encuesta ENFIH-2019 del INEGI: [1 horas, 0.5 puntos cada inciso]
+
+### (a) Obtenga los microdatos de la ENFIH.
+
+El tratamiento a la base de datos y el calculo de la variable de riqueza neta de los hogares en sí misma puede consultarse en el archivo llamado main_scrip_6
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+```{r, warning=FALSE, message=FALSE, include=FALSE}
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(scales)
+library(ggplot2)
+```
+
+```{r, include=FALSE}
+rm(list = ls(all = TRUE))
+options(digits = 17)
+setwd("C:/.../.../...")
+
+# Guardar referencia a read.csv ANTES de sobreescribirla
+read.csv.original <- utils::read.csv
+read.csv <- function(file, ...) {
+  df <- read.csv.original(file, ...)
+  
+  # (1) Nombres a minúsculas
+  names(df) <- tolower(names(df))
+  
+  # (2) Eliminar ceros a la izquierda en llaves de merge
+  llave_cols <- c("folio", "viv_sel", "hogar", "n_ren")
+  for (col in llave_cols) {
+    if (col %in% names(df)) {
+      df[[col]] <- as.character(as.numeric(as.character(df[[col]])))
+    }
+  }
+  
+  # (3) Reemplazar "" por "0" en columnas numéricas problemáticas
+  cols_vacias <- c("p7_3_1", "p7_3_2", "p7_3_3",
+                   "p4_10",  "p4_10a", "p4_55",
+                   "p4_42")                          # agregado p4_42
+  for (col in cols_vacias) {
+    if (col %in% names(df)) {
+      df[[col]][df[[col]] == ""] <- "0"
+    }
+  }
+  
+  return(df)
+}
+```
+
+```{r}
+# Creo la tabla concentradora a partir de la tabla de hogares
+tmp_hogar1 <- read.csv(file = "THogar.csv", header = TRUE, sep = ",",
+                       colClasses = "character")
+
+# El wrapper ya convirtió folio, viv_sel, hogar a character sin ceros a la izquierda
+tmp_hogar1$llavevi <- paste(tmp_hogar1$folio, tmp_hogar1$viv_sel, sep="")
+tmp_hogar1$llaveho <- paste(tmp_hogar1$folio, tmp_hogar1$viv_sel, tmp_hogar1$hogar, sep="")
+
+tmp_hogar1$fac_hog <- as.numeric(tmp_hogar1$fac_hog)
+
+# Variable que identifica Hogar Principal
+tmp_hogar1$h_ppal <- ifelse(trimws(tmp_hogar1$p2_9) == "" | tmp_hogar1$p2_9 == "1", 1, 0)
+
+# ── Activos NO Financieros ──────────────────────────────────
+tmp_hogar1$sacvo_nofn <- 0
+tmp_hogar1$cacvo_nofn <- 0
+tmp_hogar1$val_nofin  <- 0   # nombre en minúsculas, consistente con bloque 2
+
+tmp_hogar1$con_vpal   <- 0
+tmp_hogar1$val_vpal   <- 0
+tmp_hogar1$con_vsec   <- 0
+tmp_hogar1$val_vsec   <- 0
+tmp_hogar1$con_vehic  <- 0
+tmp_hogar1$val_vehic  <- 0
+tmp_hogar1$con_menaje <- 0
+tmp_hogar1$val_menaje <- 0
+tmp_hogar1$con_ngcio  <- 0
+tmp_hogar1$val_ngcio  <- 0
+tmp_hogar1$con_bprod  <- 0
+tmp_hogar1$val_bprod  <- 0
+
+# ── Activos Financieros (agregados) ────────────────────────
+tmp_hogar1$sacvo_fin  <- 0
+tmp_hogar1$cacvo_fin  <- 0
+tmp_hogar1$val_finan  <- 0
+
+tmp_hogar1$c_ctachqs  <- 0
+tmp_hogar1$v_ctachqs  <- 0
+tmp_hogar1$c_nompen   <- 0
+tmp_hogar1$v_nompen   <- 0
+tmp_hogar1$c_ctagob   <- 0
+tmp_hogar1$v_ctagob   <- 0   # corregido: v_Ctagob -> v_ctagob (problema 7)
+tmp_hogar1$c_prvinvr  <- 0
+tmp_hogar1$v_prvinvr  <- 0
+tmp_hogar1$c_afore    <- 0
+tmp_hogar1$v_afore    <- 0
+tmp_hogar1$c_segvid   <- 0
+tmp_hogar1$v_segvid   <- 0
+tmp_hogar1$c_otroaf   <- 0
+tmp_hogar1$v_otroaf   <- 0
+
+# ── Activos Financieros (componentes) ──────────────────────
+tmp_hogar1$c_ahcaja   <- 0
+tmp_hogar1$v_ahcaja   <- 0
+tmp_hogar1$c_ahfami   <- 0
+tmp_hogar1$v_ahfami   <- 0
+tmp_hogar1$c_ahtanda  <- 0
+tmp_hogar1$v_ahtanda  <- 0
+tmp_hogar1$c_ahprest  <- 0
+tmp_hogar1$v_ahprest  <- 0
+tmp_hogar1$c_ahotro1  <- 0
+tmp_hogar1$v_ahotro1  <- 0
+tmp_hogar1$c_ahcta    <- 0
+tmp_hogar1$v_ahcta    <- 0
+tmp_hogar1$c_ahchqs   <- 0
+tmp_hogar1$v_ahchqs   <- 0
+tmp_hogar1$c_ahprv    <- 0
+tmp_hogar1$v_ahprv    <- 0
+tmp_hogar1$c_ahinvrs  <- 0
+tmp_hogar1$v_ahinvrs  <- 0
+tmp_hogar1$c_ahotro2  <- 0
+tmp_hogar1$v_ahotro2  <- 0
+tmp_hogar1$c_ahnompe  <- 0
+tmp_hogar1$v_ahnompe <- 0 # tenencia y valor de ahorro mediante cuenta de nomina opensión por hogar
+tmp_hogar1$c_ahctago <- 0
+tmp_hogar1$v_ahctago <- 0 # tenencia y valor de ahorro mediante cuentas de apoyo de gobierno por hogar
+tmp_hogar1$c_ahafore <- 0
+tmp_hogar1$v_ahafore <- 0 # tenencia y valor de ahorro mediante cuenta de afore por hogar
+tmp_hogar1$c_ahsegvi <- 0
+tmp_hogar1$v_ahsegvi <- 0 # tenencia y valor de ahorro mediante SEGURO DE VIDA por hogar
+tmp_hogar1$c_ahot18 <- 0
+tmp_hogar1$v_ahot18 <- 0 # tenencia y valor de ahorro con otros medios formales por hogar
+tmp_hogar1$c_activos <- 0
+tmp_hogar1$v_activos <- 0
+
+```
+
+```{r}
+# variables de deuda
+tmp_hogar1$ccred_vpal  <- 0
+tmp_hogar1$mnto_vpal   <- 0
+tmp_hogar1$ccred_vsec  <- 0
+tmp_hogar1$mnto_vsec   <- 0
+tmp_hogar1$ccred_ot1   <- 0
+tmp_hogar1$mnto_ot1    <- 0
+tmp_hogar1$ccred_neg   <- 0
+tmp_hogar1$mnto_neg    <- 0
+tmp_hogar1$ccred_agri  <- 0
+tmp_hogar1$mnto_agri   <- 0
+tmp_hogar1$ccred_auto  <- 0
+tmp_hogar1$mnto_auto   <- 0
+tmp_hogar1$ccred_moto  <- 0
+tmp_hogar1$mnto_moto   <- 0
+tmp_hogar1$ccred_ot2   <- 0
+tmp_hogar1$mnto_ot2    <- 0
+tmp_hogar1$ccred_dptl  <- 0
+tmp_hogar1$mnto_dptl   <- 0
+tmp_hogar1$ccred_bnco  <- 0
+tmp_hogar1$mnto_bnco   <- 0
+tmp_hogar1$ccred_nom   <- 0
+tmp_hogar1$mnto_nom    <- 0
+tmp_hogar1$ccred_edu   <- 0
+tmp_hogar1$mnto_edu    <- 0
+tmp_hogar1$ccred_per   <- 0
+tmp_hogar1$mnto_per    <- 0
+tmp_hogar1$ccred_gru   <- 0
+tmp_hogar1$mnto_gru    <- 0
+tmp_hogar1$cred_hip    <- 0   # Cred_hip -> cred_hip (minúsculas, problema 6)
+tmp_hogar1$mto_hipot   <- 0
+tmp_hogar1$cred_nohip  <- 0
+tmp_hogar1$mto_nohipo  <- 0
+tmp_hogar1$cred_tcrd   <- 0
+tmp_hogar1$mto_tcrd    <- 0
+tmp_hogar1$cred_nmpe   <- 0
+tmp_hogar1$mto_nmpe    <- 0
+tmp_hogar1$cred_aumo   <- 0
+tmp_hogar1$mto_aumo    <- 0
+tmp_hogar1$cred_rest   <- 0
+tmp_hogar1$mto_rest    <- 0
+tmp_hogar1$cred_tot    <- 0
+tmp_hogar1$mto_ctot    <- 0
+tmp_hogar1$sin_deuda   <- 0
+
+```
+
+```{r}
+# *****************INICIO DE SECCION DE ACTIVOS NO FINANCIEROS
+# **************************************************************************************
+#
+# *****Tablas auxiliares para el calculo de activos
+# * Los valores No_Responde/No sabe se concideran en tenencia del activo con valor 0
+# * Las tablas auxiliares estan a nivel hogar ( folio, Viv_sel, Hogar)
+# * La tabla de variables de vivienda vicvivenda principal y menaje de casa se pegan
+#   a la tabla de hogar solo en hogar Principal
+# ******Vivienda Principal y menaje de casa
+aux_vivienda <- read.csv(file = "TVivienda.csv", header=TRUE, sep=",",
+colClasses="character")
+aux_vivienda$llavevi <- paste(aux_vivienda$folio, aux_vivienda$viv_sel, sep="")  # LlaveVI -> llavevi
+aux_vivienda <- aux_vivienda[(as.integer(aux_vivienda$p4_10) > 0 |
+as.integer(aux_vivienda$p4_55) > 0), ]
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10)>= 1 &
+as.integer(aux_vivienda$p4_10) <= 999999887, 1, 0)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10)>= 1 &
+as.integer(aux_vivienda$p4_10) <= 999999887, as.integer(aux_vivienda$p4_10), 0)
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "1", 1, aux_vivienda$con_vpal)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "1", 200000, aux_vivienda$val_vpal)
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "2", 1, aux_vivienda$con_vpal)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "2", 500000, aux_vivienda$val_vpal)
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "3", 1, aux_vivienda$con_vpal)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "3", 800000, aux_vivienda$val_vpal)
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "4", 1, aux_vivienda$con_vpal)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "4", 1750000, aux_vivienda$val_vpal)
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "5", 1, aux_vivienda$con_vpal)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "5", 3750000, aux_vivienda$val_vpal)
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "6", 1, aux_vivienda$con_vpal)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a == "6", 7500000, aux_vivienda$val_vpal)
+aux_vivienda$con_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a %in% c("8","9"), 1, aux_vivienda$con_vpal)
+aux_vivienda$val_vpal <- ifelse(as.integer(aux_vivienda$p4_10) %in% c(999999888,
+999999999) & aux_vivienda$p4_10a %in% c("8","9"), 0, aux_vivienda$val_vpal)
+```
+
+```{r}
+# ****Menaje de casa
+aux_vivienda$con_menaje <- ifelse(as.integer(aux_vivienda$p4_55) >= 1 &
+as.integer(aux_vivienda$p4_55) <= 999999887, 1, 0)
+aux_vivienda$val_menaje <- ifelse(as.integer(aux_vivienda$p4_55) >= 1 &
+as.integer(aux_vivienda$p4_55) <= 999999887, as.integer(aux_vivienda$p4_55), 0)
+# Marca tenencia 1 y valor cero si el valor del menaje fue NE/NR
+aux_vivienda$con_menaje <- ifelse(as.integer(aux_vivienda$p4_55) %in% c(999999888,
+999999999), 1, aux_vivienda$con_menaje)
+aux_vivienda$val_menaje <- ifelse(as.integer(aux_vivienda$p4_55) %in% c(999999888,
+999999999), 0, aux_vivienda$val_menaje)
+# ***Vivienda Secundaria
+tmp_propiedad <- read.csv(file = "TPropiedad.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_propiedad$llavevi <- paste(tmp_propiedad$folio, tmp_propiedad$viv_sel, sep="")        # LlaveVI -> llavevi
+tmp_propiedad$llaveho <- paste(tmp_propiedad$folio, tmp_propiedad$viv_sel,
+tmp_propiedad$hogar, sep="")                                                             # LlaveHO -> llaveho
+tmp_propiedad$llavesd <- paste(tmp_propiedad$folio, tmp_propiedad$viv_sel,
+tmp_propiedad$hogar, tmp_propiedad$n_ren, sep="")                                        # LlaveSD -> llavesd
+tmp_propiedad <- tmp_propiedad[order(tmp_propiedad$llaveho), ]
+tmp_propiedad$factor <- as.integer(tmp_propiedad$factor)
+# Valor de la vivienda Secundaria
+tmp_propiedad$val_vsec <- ifelse(as.integer(tmp_propiedad$p5_10) >= 1 &
+as.integer(tmp_propiedad$p5_10) <= 999999887, as.integer(tmp_propiedad$p5_10), 0)
+aux_propiedad <- aggregate(tmp_propiedad[,c("val_vsec")],by =
+list(tmp_propiedad$llaveho),FUN = sum)
+aux_propiedad$con_vsec <- 1
+colnames(aux_propiedad)[colnames(aux_propiedad) == "Group.1" ] <- "llaveho"             # LlaveHO -> llaveho
+colnames(aux_propiedad)[colnames(aux_propiedad) == "x" ] <- "val_vsec"
+# **** Bienes Productivos
+tmp_Bprod <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_Bprod$llavevi <- paste(tmp_Bprod$folio, tmp_Bprod$viv_sel, sep="")                   # LlaveVI -> llavevi
+tmp_Bprod$llaveho <- paste(tmp_Bprod$folio, tmp_Bprod$viv_sel, tmp_Bprod$hogar, sep="")  # LlaveHO -> llaveho
+tmp_Bprod$llavesd <- paste(tmp_Bprod$folio, tmp_Bprod$viv_sel, tmp_Bprod$hogar,
+tmp_Bprod$n_ren, sep="")                                                                 # LlaveSD -> llavesd
+tmp_Bprod <- tmp_Bprod[(tmp_Bprod$p6_23 == "1" ), ]
+tmp_Bprod <- tmp_Bprod[order(tmp_Bprod$llaveho), ]
+tmp_Bprod$factor <- as.integer(tmp_Bprod$factor)
+# Valor de Bienes Productivos
+tmp_Bprod$val_bprod <- ifelse(as.integer(tmp_Bprod$p6_24) >= 1 &
+as.integer(tmp_Bprod$p6_24) <= 999999887, as.integer(tmp_Bprod$p6_24), 0)
+aux_Bprod <- aggregate(tmp_Bprod[,c("val_bprod")],by = list(tmp_Bprod$llaveho),FUN =
+sum)
+aux_Bprod$con_bprod <- 1
+colnames(aux_Bprod)[colnames(aux_Bprod) == "Group.1" ] <- "llaveho"                    # LlaveHO -> llaveho
+colnames(aux_Bprod)[colnames(aux_Bprod) == "x" ] <- "val_bprod"
+# ****Vehículo Auto/Moto/Otros
+tmp_vehic <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_vehic$llavevi <- paste(tmp_vehic$folio, tmp_vehic$viv_sel, sep="")                    # LlaveVI -> llavevi
+tmp_vehic$llaveho <- paste(tmp_vehic$folio, tmp_vehic$viv_sel, tmp_vehic$hogar, sep="")   # LlaveHO -> llaveho
+tmp_vehic$llavesd <- paste(tmp_vehic$folio, tmp_vehic$viv_sel, tmp_vehic$hogar,
+tmp_vehic$n_ren, sep="")                                                                  # LlaveSD -> llavesd
+tmp_vehic <- tmp_vehic[(tmp_vehic$p7_1_1 == "1" | tmp_vehic$p7_1_2 == "1" |
+tmp_vehic$p7_1_3 == "1"), ]
+tmp_vehic <- tmp_vehic[order(tmp_vehic$llaveho), ]
+tmp_vehic$factor <- as.integer(tmp_vehic$factor)
+tmp_vehic$VAL_vehic <- ifelse(as.integer(tmp_vehic$p7_3_1) >= 1 &
+as.integer(tmp_vehic$p7_3_1) <= 999999887, as.integer(tmp_vehic$p7_3_1), 0)
+tmp_vehic$VAL_vehic <- ifelse(tmp_vehic$VAL_vehic + as.integer(tmp_vehic$p7_3_2) >= 1 &
+tmp_vehic$VAL_vehic + as.integer(tmp_vehic$p7_3_2) <= 999999887, tmp_vehic$VAL_vehic +
+as.integer(tmp_vehic$p7_3_2), tmp_vehic$VAL_vehic)
+tmp_vehic$VAL_vehic <- ifelse(tmp_vehic$VAL_vehic + as.integer(tmp_vehic$p7_3_3) >= 1 &
+tmp_vehic$VAL_vehic + as.integer(tmp_vehic$p7_3_3) <= 999999887, tmp_vehic$VAL_vehic +
+as.integer(tmp_vehic$p7_3_3), tmp_vehic$VAL_vehic)
+aux_vehic <- aggregate(tmp_vehic[,c("VAL_vehic")],by = list(tmp_vehic$llaveho), FUN =
+sum)
+aux_vehic$con_vehic <- 1
+colnames(aux_vehic)[colnames(aux_vehic) == "Group.1" ] <- "llaveho"                     # LlaveHO -> llaveho
+colnames(aux_vehic)[colnames(aux_vehic) == "x" ] <- "val_vehic" 
+
+```
+
+```{r}
+# ****** Negocio
+# ************ Dueño Unico
+tmp_unico <- read.csv(file = "TUnico.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_unico$llavevi <- paste(tmp_unico$folio, tmp_unico$viv_sel, sep="")            # LlaveVI -> llavevi
+tmp_unico$llaveho <- paste(tmp_unico$folio, tmp_unico$viv_sel, tmp_unico$hogar, sep="")  # LlaveHO -> llaveho
+tmp_unico$llavesd <- paste(tmp_unico$folio, tmp_unico$viv_sel, tmp_unico$hogar,
+tmp_unico$n_ren, sep="")                                                         # LlaveSD -> llavesd
+tmp_unico <- tmp_unico[order(tmp_unico$llaveho), ]
+tmp_unico$factor <- as.integer(tmp_unico$factor)
+tmp_unico$val_unico <- ifelse(as.integer(tmp_unico$p6_9) >= 1 &
+as.integer(tmp_unico$p6_9) <= 999999887, as.integer(tmp_unico$p6_9), 0)
+aux_unico <- aggregate(tmp_unico[,c("val_unico")],by = list(tmp_unico$llaveho), FUN = sum)
+colnames(aux_unico)[colnames(aux_unico) == "Group.1" ] <- "llaveho"             # LlaveHO -> llaveho
+colnames(aux_unico)[colnames(aux_unico) == "x" ] <- "val_unico"
+# ************Dueño de una parte
+tmp_comparte <- read.csv(file = "TComparte.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_comparte$llavevi <- paste(tmp_comparte$folio, tmp_comparte$viv_sel, sep="")   # LlaveVI -> llavevi
+tmp_comparte$llaveho <- paste(tmp_comparte$folio, tmp_comparte$viv_sel,
+tmp_comparte$hogar, sep="")                                                      # LlaveHO -> llaveho
+tmp_comparte$llavesd <- paste(tmp_comparte$folio, tmp_comparte$viv_sel,
+tmp_comparte$hogar, tmp_comparte$n_ren, sep="")                                  # LlaveSD -> llavesd
+tmp_comparte <- tmp_comparte[order(tmp_comparte$llaveho), ]
+tmp_comparte$factor <- as.integer(tmp_comparte$factor)
+tmp_comparte$val_compar <- ifelse(as.integer(tmp_comparte$p6_4) >= 1 &
+as.integer(tmp_comparte$p6_4) <= 999999887, as.integer(tmp_comparte$p6_4), 0)
+aux_comparte <- aggregate(tmp_comparte[,c("val_compar")],by = list(tmp_comparte$llaveho), FUN = sum)
+colnames(aux_comparte)[colnames(aux_comparte) == "Group.1" ] <- "llaveho"       # LlaveHO -> llaveho
+colnames(aux_comparte)[colnames(aux_comparte) == "x" ] <- "val_compar"
+
+# * Asigna la tenencia de cada activo no financiero a la tabla de Hogar
+# ****vivienda Principal y menaje de casa
+# Fix problema 5: merge por llavevi, luego valores solo para hogar principal
+tmp_hogar1 <- merge(tmp_hogar1, aux_vivienda[, names(aux_vivienda) %in%
+c("con_vpal", "val_vpal", "con_menaje", "val_menaje", "llavevi") ],  # LlaveVI -> llavevi, se quita h_ppal (ya está en tmp_hogar1)
+by="llavevi", all.x = T)                                                         # LlaveVI -> llavevi
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "con_vpal.x" ] <- "con_vpal"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "val_vpal.x" ] <- "val_vpal"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "con_menaje.x"] <- "con_menaje"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "val_menaje.x"] <- "val_menaje"
+# Fix problema 5: val_vpal y val_menaje solo para hogar principal
+tmp_hogar1$con_vpal  <- ifelse(tmp_hogar1$h_ppal == 1, tmp_hogar1$con_vpal.y,  0)
+tmp_hogar1$val_vpal  <- ifelse(tmp_hogar1$h_ppal == 1, tmp_hogar1$val_vpal.y,  0)
+tmp_hogar1$con_menaje <- ifelse(tmp_hogar1$h_ppal == 1, tmp_hogar1$con_menaje.y, 0)
+tmp_hogar1$val_menaje <- ifelse(tmp_hogar1$h_ppal == 1, tmp_hogar1$val_menaje.y, 0)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in%
+c("con_vpal.y", "val_vpal.y", "con_menaje.y", "val_menaje.y") ]
+```
+
+```{r}
+# ****vivienda secundaria
+tmp_hogar1 <- merge(tmp_hogar1, aux_propiedad[, names(aux_propiedad) %in%
+c("con_vsec", "val_vsec", "llaveho") ],                                          # LlaveHO -> llaveho
+by="llaveho", all.x = T)                                                         # LlaveHO -> llaveho
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "con_vsec.x" ] <- "con_vsec"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "val_vsec.x" ] <- "val_vsec"
+tmp_hogar1$con_vsec = ifelse(is.na(tmp_hogar1$con_vsec.y), 0, tmp_hogar1$con_vsec.y)
+tmp_hogar1$val_vsec = ifelse(is.na(tmp_hogar1$val_vsec.y), 0, tmp_hogar1$val_vsec.y)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("con_vsec.y", "val_vsec.y") ]
+# ****vehículo
+tmp_hogar1 <- merge(tmp_hogar1, aux_vehic[, names(aux_vehic) %in%
+c("con_vehic", "val_vehic", "llaveho") ],                                        # LlaveHO -> llaveho
+by="llaveho", all.x = T)                                                         # LlaveHO -> llaveho
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "con_vehic.x" ] <- "con_vehic"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "val_vehic.x" ] <- "val_vehic"
+tmp_hogar1$con_vehic <- ifelse(is.na(tmp_hogar1$con_vehic.y), 0, tmp_hogar1$con_vehic.y)
+tmp_hogar1$val_vehic <- ifelse(is.na(tmp_hogar1$val_vehic.y), 0, tmp_hogar1$val_vehic.y)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("con_vehic.y", "val_vehic.y") ]
+# ****Bienes Productivos
+tmp_hogar1 <- merge(tmp_hogar1, aux_Bprod[, names(aux_Bprod) %in%
+c("con_bprod", "val_bprod", "llaveho") ],                                        # LlaveHO -> llaveho
+by="llaveho", all.x = T)                                                         # LlaveHO -> llaveho
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "con_bprod.x" ] <- "con_bprod"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "val_bprod.x" ] <- "val_bprod"
+tmp_hogar1$con_bprod <- ifelse(is.na(tmp_hogar1$con_bprod.y), 0, tmp_hogar1$con_bprod.y)
+tmp_hogar1$val_bprod <- ifelse(is.na(tmp_hogar1$val_bprod.y), 0, tmp_hogar1$val_bprod.y)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("con_bprod.y", "val_bprod.y") ]
+# *****Negocio
+tmp_hogar1 <- merge(tmp_hogar1, aux_unico[, names(aux_unico) %in%
+c("val_unico", "llaveho") ],                                                     # LlaveHO -> llaveho
+by="llaveho", all.x = T)                                                         # LlaveHO -> llaveho
+tmp_hogar1$con_ngcio <- ifelse(is.na(tmp_hogar1$val_unico), 0, 1)
+tmp_hogar1$val_ngcio <- ifelse(is.na(tmp_hogar1$val_unico), 0, tmp_hogar1$val_unico)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("val_unico") ]
+tmp_hogar1 <- merge(tmp_hogar1, aux_comparte[, names(aux_comparte) %in%
+c("val_compar", "llaveho") ],                                                    # LlaveHO -> llaveho
+by="llaveho", all.x = T)                                                         # LlaveHO -> llaveho
+tmp_hogar1$con_ngcio <- ifelse(is.na(tmp_hogar1$val_compar), tmp_hogar1$con_ngcio, 1)
+tmp_hogar1$val_compar <- ifelse(is.na(tmp_hogar1$val_compar), 0, tmp_hogar1$val_compar)
+tmp_hogar1$val_ngcio <- tmp_hogar1$val_ngcio + tmp_hogar1$val_compar
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("val_compar") ]
+```
+
+```{r}
+# ********************************************************
+# ***HOgares con Activos No financiero
+# *** su valor
+# *** Hogares Sin Activos No financieros
+tmp_hogar1$cacvo_nofn <- ifelse(ifelse(is.na(tmp_hogar1$con_vpal ), 0,
+tmp_hogar1$con_vpal ) +
+ ifelse(is.na(tmp_hogar1$con_vsec ), 0,
+tmp_hogar1$con_vsec ) +
+ifelse(is.na(tmp_hogar1$con_vehic ), 0,
+tmp_hogar1$con_vehic ) +
+ifelse(is.na(tmp_hogar1$con_menaje), 0,
+tmp_hogar1$con_menaje) +
+ifelse(is.na(tmp_hogar1$con_ngcio ), 0,
+tmp_hogar1$con_ngcio ) +
+ ifelse(is.na(tmp_hogar1$con_bprod ), 0,
+tmp_hogar1$con_bprod ) > 0 , 1, 0)
+# Fix problema 4: val_nofin en una sola expresión con <-
+tmp_hogar1$val_nofin <-
+  ifelse(is.na(tmp_hogar1$val_vpal ),  0, tmp_hogar1$val_vpal )  +
+  ifelse(is.na(tmp_hogar1$val_vsec ),  0, tmp_hogar1$val_vsec )  +
+  ifelse(is.na(tmp_hogar1$val_vehic ), 0, tmp_hogar1$val_vehic ) +
+  ifelse(is.na(tmp_hogar1$val_menaje), 0, tmp_hogar1$val_menaje) +
+  ifelse(is.na(tmp_hogar1$val_ngcio ), 0, tmp_hogar1$val_ngcio ) +
+  ifelse(is.na(tmp_hogar1$val_bprod ), 0, tmp_hogar1$val_bprod )
+tmp_hogar1$sacvo_nofn <- ifelse(tmp_hogar1$cacvo_nofn == 1, 0, 1)
+tmp_hogar1$aux1 <- tmp_hogar1$fac_hog * tmp_hogar1$cacvo_nofn
+tmp_hogar1$aux2 <- tmp_hogar1$fac_hog * tmp_hogar1$val_nofin
+gpo1 <- sum(aggregate(tmp_hogar1[,c("aux1")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)
+gpo2 <- sum(aggregate(tmp_hogar1[,c("aux2")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)/1000000
+nofinan <- data.frame(list("id" = 0, "desc" = " Activos NO Financieros", "hogares" =
+gpo1, "monto" = gpo2))
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("aux1","aux2") ]
+        
+```
+
+```{r}
+# **************************************************************************************
+# *****************INICIO DE SECCION DE ACTIVOS FINANCIEROS
+# **************************************************************************************
+# *****Tablas auxiliares para el calculo de activos Financiero
+# * Los valores No_Responde/No sabe se concideran en tenencia del activo con valor 0
+# * Las tablas auxiliares estan a nivel hogar ( folio, Viv_sel, Hogar)
+# * Tabla auxiliar a partir de tmodulo con la info de activos financieros
+tmp_financieros <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_financieros$llavevi <- paste(tmp_financieros$folio, tmp_financieros$viv_sel, sep="")  # LlaveVI -> llavevi
+tmp_financieros$llaveho <- paste(tmp_financieros$folio, tmp_financieros$viv_sel,
+tmp_financieros$hogar, sep="")                                                           # LlaveHO -> llaveho
+tmp_financieros$llavesd <- paste(tmp_financieros$folio, tmp_financieros$viv_sel,
+tmp_financieros$hogar, tmp_financieros$n_ren, sep="")                                    # LlaveSD -> llavesd
+tmp_financieros$Elimina <- ifelse( ifelse(is.na(tmp_financieros$p9_1_1 ) | gsub(" ", "",
+tmp_financieros$p9_1_1 ) == "", 0, as.integer(tmp_financieros$p9_1_1 )) +
+ifelse(is.na(tmp_financieros$p9_1_2 ) | gsub(" ", "",
+tmp_financieros$p9_1_2 ) == "", 0, as.integer(tmp_financieros$p9_1_2 )) +
+ifelse(is.na(tmp_financieros$p9_1_3 ) | gsub(" ", "",
+tmp_financieros$p9_1_3 ) == "", 0, as.integer(tmp_financieros$p9_1_3 )) +
+ ifelse(is.na(tmp_financieros$p9_1_4 ) | gsub(" ", "",
+tmp_financieros$p9_1_4 ) == "", 0, as.integer(tmp_financieros$p9_1_4 )) +
+ifelse(is.na(tmp_financieros$p9_1_5 ) | gsub(" ", "",
+tmp_financieros$p9_1_5 ) == "", 0, as.integer(tmp_financieros$p9_1_5 )) +
+ifelse(is.na(tmp_financieros$p9_3_1 ) | gsub(" ", "",
+tmp_financieros$p9_3_1 ) == "", 0, as.integer(tmp_financieros$p9_3_1 )) +
+ifelse(is.na(tmp_financieros$p9_3_2 ) | gsub(" ", "",
+tmp_financieros$p9_3_2 ) == "", 0, as.integer(tmp_financieros$p9_3_2 )) +
+ifelse(is.na(tmp_financieros$p9_3_3 ) | gsub(" ", "",
+tmp_financieros$p9_3_3 ) == "", 0, as.integer(tmp_financieros$p9_3_3 )) +
+ ifelse(is.na(tmp_financieros$p9_3_4 ) | gsub(" ", "",
+tmp_financieros$p9_3_4 ) == "", 0, as.integer(tmp_financieros$p9_3_4 )) +
+ifelse(is.na(tmp_financieros$p9_3_5 ) | gsub(" ", "",
+tmp_financieros$p9_3_5 ) == "", 0, as.integer(tmp_financieros$p9_3_5 )) +
+ifelse(is.na(tmp_financieros$p9_3_6 ) | gsub(" ", "",
+tmp_financieros$p9_3_6 ) == "", 0, as.integer(tmp_financieros$p9_3_6 )) +
+ ifelse(is.na(tmp_financieros$p9_3_7 ) | gsub(" ", "",
+tmp_financieros$p9_3_7 ) == "", 0, as.integer(tmp_financieros$p9_3_7 )) +
+ ifelse(is.na(tmp_financieros$p9_10 ) | gsub(" ", "",
+tmp_financieros$p9_10 ) == "", 0, as.integer(tmp_financieros$p9_10 )) +
+ifelse(is.na(tmp_financieros$p9_15_1) | gsub(" ", "",
+tmp_financieros$p9_15_1) == "", 0, as.integer(tmp_financieros$p9_15_1)) > 0, "No", "Si")
+tmp_financieros <- tmp_financieros[ tmp_financieros$Elimina != "Si" , ]
+# Eliminar columnas innecesarias
+tmp_financieros <- tmp_financieros[, names(tmp_financieros) %in% c("llavevi", "llaveho",
+"llavesd", "p9_1_1", "p9_1_2", "p9_1_3", "p9_1_4", "p9_1_5", "p9_3_7", "p9_15_1",
+"p9_10", "p9_3_5", "p9_3_6", "p9_3_2", "p9_3_3", "p9_3_4", "p9_3_1", "p9_2_1", "p9_2_2",
+"p9_2_3", "p9_2_4", "p9_2_5", "p9_5a_3", "p9_5a_4", "p9_5a_5", "p9_5a_6", "p9_5a_7",
+"p9_7", "p9_9", "p9_11", "p9_16_1") ]                                                   # LlaveVI/HO/SD -> minúsculas
+# ***Agrego a la tabla auxiliar los campos necesarios para la preparación de la info
+# **** ( Tenencia del instrumento/ tratamiento a no especificados
+tmp_financieros$c_ahcaja  <- 0
+tmp_financieros$v_ahcaja  <- 0
+tmp_financieros$c_ahfami  <- 0
+tmp_financieros$v_ahfami  <- 0
+tmp_financieros$c_ahtanda <- 0
+tmp_financieros$v_ahtanda <- 0
+tmp_financieros$c_ahprest <- 0
+tmp_financieros$v_ahprest <- 0
+tmp_financieros$c_ahotro1 <- 0
+tmp_financieros$v_ahotro1 <- 0
+tmp_financieros$c_ahcta   <- 0
+tmp_financieros$v_ahcta   <- 0
+tmp_financieros$c_ahchqs  <- 0
+tmp_financieros$v_ahchqs  <- 0
+tmp_financieros$c_ahprv   <- 0
+tmp_financieros$v_ahprv   <- 0
+tmp_financieros$c_ahinvrs <- 0
+tmp_financieros$v_ahinvrs <- 0
+tmp_financieros$c_ahotro2 <- 0
+tmp_financieros$v_ahotro2 <- 0
+tmp_financieros$c_ahnompe <- 0
+tmp_financieros$v_ahnompe <- 0
+tmp_financieros$c_ahctago <- 0
+tmp_financieros$v_ahctago <- 0
+tmp_financieros$c_ahafore <- 0
+tmp_financieros$v_ahafore <- 0
+tmp_financieros$c_ahsegvi <- 0
+tmp_financieros$v_ahsegvi <- 0
+tmp_financieros$c_ahot18  <- 0
+tmp_financieros$v_ahot18  <- 0                                       
+```
+
+```{r}
+# ******* Seleccion de tenencia y tratamiento a No_Rsponde/No_Sabe
+tmp_financieros$c_ahcaja <- ifelse(tmp_financieros$p9_1_1 == "1", 1,
+tmp_financieros$c_ahcaja)
+tmp_financieros$v_ahcaja <- ifelse(tmp_financieros$p9_1_1 == "1" &
+as.integer(tmp_financieros$p9_2_1) >= 1 & as.integer(tmp_financieros$p9_2_1) <= 999887
+, as.integer(tmp_financieros$p9_2_1) , tmp_financieros$v_ahcaja)
+tmp_financieros$c_ahfami <- ifelse(tmp_financieros$p9_1_2 == "1", 1, 
+tmp_financieros$c_ahfami)
+tmp_financieros$v_ahfami <- ifelse(tmp_financieros$p9_1_2 == "1" &
+as.integer(tmp_financieros$p9_2_2) >= 1 & as.integer(tmp_financieros$p9_2_2) <= 999887
+, as.integer(tmp_financieros$p9_2_2) , tmp_financieros$v_ahfami)
+tmp_financieros$c_ahtanda <- ifelse(tmp_financieros$p9_1_3 == "1", 1,
+tmp_financieros$c_ahtanda)
+tmp_financieros$v_ahtanda <- ifelse(tmp_financieros$p9_1_3 == "1" &
+as.integer(tmp_financieros$p9_2_3) >= 1 & as.integer(tmp_financieros$p9_2_3) <= 999887
+, as.integer(tmp_financieros$p9_2_3) , tmp_financieros$v_ahtanda)
+tmp_financieros$c_ahprest <- ifelse(tmp_financieros$p9_1_4 == "1", 1,
+tmp_financieros$c_ahprest)
+tmp_financieros$v_ahprest <- ifelse(tmp_financieros$p9_1_4 == "1" &
+as.integer(tmp_financieros$p9_2_4) >= 1 & as.integer(tmp_financieros$p9_2_4) <= 999887
+, as.integer(tmp_financieros$p9_2_4) , tmp_financieros$v_ahprest)
+tmp_financieros$c_ahotro1 <- ifelse(tmp_financieros$p9_1_5 == "1", 1,
+tmp_financieros$c_ahotro1)
+tmp_financieros$v_ahotro1 <- ifelse(tmp_financieros$p9_1_5 == "1" &
+as.integer(tmp_financieros$p9_2_5) >= 1 & as.integer(tmp_financieros$p9_2_5) <= 999887
+, as.integer(tmp_financieros$p9_2_5) , tmp_financieros$v_ahotro1)
+tmp_financieros$c_ahcta <- ifelse(tmp_financieros$p9_3_3 == "1", 1,
+tmp_financieros$c_ahcta)
+tmp_financieros$v_ahcta <- ifelse(tmp_financieros$p9_3_3 == "1" &
+as.integer(tmp_financieros$p9_5a_3) >= 1 & as.integer(tmp_financieros$p9_5a_3) <=
+999999887, as.integer(tmp_financieros$p9_5a_3), tmp_financieros$v_ahcta)
+tmp_financieros$c_ahchqs <- ifelse(tmp_financieros$p9_3_4 == "1", 1,
+tmp_financieros$c_ahchqs)
+tmp_financieros$v_ahchqs <- ifelse(tmp_financieros$p9_3_4 == "1" &
+as.integer(tmp_financieros$p9_5a_4) >= 1 & as.integer(tmp_financieros$p9_5a_4) <=
+999999887, as.integer(tmp_financieros$p9_5a_4), tmp_financieros$v_ahchqs)
+tmp_financieros$c_ahprv <- ifelse(tmp_financieros$p9_3_5 == "1", 1,
+tmp_financieros$c_ahprv)
+tmp_financieros$v_ahprv <- ifelse(tmp_financieros$p9_3_5 == "1" &
+as.integer(tmp_financieros$p9_5a_5) >= 1 & as.integer(tmp_financieros$p9_5a_5) <=
+999999887, as.integer(tmp_financieros$p9_5a_5), tmp_financieros$v_ahprv)
+tmp_financieros$c_ahinvrs <- ifelse(tmp_financieros$p9_3_6 == "1", 1,
+tmp_financieros$c_ahinvrs)
+tmp_financieros$v_ahinvrs <- ifelse(tmp_financieros$p9_3_6 == "1" &
+as.integer(tmp_financieros$p9_5a_6) >= 1 & as.integer(tmp_financieros$p9_5a_6) <=
+999999887, as.integer(tmp_financieros$p9_5a_6), tmp_financieros$v_ahinvrs)
+tmp_financieros$c_ahotro2 <- ifelse(tmp_financieros$p9_3_7 == "1", 1,
+tmp_financieros$c_ahotro2)
+tmp_financieros$v_ahotro2 <- ifelse(tmp_financieros$p9_3_7 == "1" &
+as.integer(tmp_financieros$p9_5a_7) >= 1 & as.integer(tmp_financieros$p9_5a_7) <=
+999999887, as.integer(tmp_financieros$p9_5a_7), tmp_financieros$v_ahotro2)
+tmp_financieros$c_ahnompe <- ifelse(tmp_financieros$p9_3_1 == "1", 1,
+tmp_financieros$c_ahnompe)
+tmp_financieros$v_ahnompe <- ifelse(tmp_financieros$p9_3_1 == "1" &
+as.integer(tmp_financieros$p9_7) >= 1 & as.integer(tmp_financieros$p9_7) <=
+9999887 , as.integer(tmp_financieros$p9_7) , tmp_financieros$v_ahnompe)
+tmp_financieros$c_ahctago <- ifelse(tmp_financieros$p9_3_2 == "1", 1,
+tmp_financieros$c_ahctago)
+tmp_financieros$v_ahctago <- ifelse(tmp_financieros$p9_3_2 == "1" &
+as.integer(tmp_financieros$p9_9) >= 1 & as.integer(tmp_financieros$p9_9) <=
+999999887, as.integer(tmp_financieros$p9_9) , tmp_financieros$v_ahctago)
+tmp_financieros$c_ahafore <- ifelse(tmp_financieros$p9_10 == "1", 1,
+tmp_financieros$c_ahafore)
+tmp_financieros$v_ahafore <- ifelse(tmp_financieros$p9_10 == "1" &
+as.integer(tmp_financieros$p9_11) >= 1 & as.integer(tmp_financieros$p9_11) <=
+999999887, as.integer(tmp_financieros$p9_11) , tmp_financieros$v_ahafore)
+tmp_financieros$c_ahsegvi <- ifelse(tmp_financieros$p9_15_1 == "1", 1,
+tmp_financieros$c_ahsegvi)
+tmp_financieros$v_ahsegvi <- ifelse(tmp_financieros$p9_15_1 == "1" & 
+as.integer(tmp_financieros$p9_16_1) >= 1 & as.integer(tmp_financieros$p9_16_1) <= 999887
+, as.integer(tmp_financieros$p9_16_1), tmp_financieros$v_ahsegvi)
+
+```
+
+```{r}
+# ***** Agrego la informacion tratada a nivel Hogar (Tenencia y valor del instrumento)
+aux_financieros <- aggregate(tmp_financieros[,c("c_ahcaja")],by =
+list(tmp_financieros$llaveho), FUN = max, na.rm=TRUE)
+colnames(aux_financieros)[colnames(aux_financieros) == "Group.1" ] <- "llaveho"
+colnames(aux_financieros)[colnames(aux_financieros) == "x" ] <- "c_ahcaja"
+gpo1 <- aggregate(tmp_financieros[,c("v_ahcaja")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahcaja"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahfami")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahfami"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahfami")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahfami"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahtanda")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahtanda"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahtanda")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahtanda"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahprest")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahprest"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahprest")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahprest"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahotro1")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahotro1"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahotro1")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahotro1"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahcta")],by = list(tmp_financieros$llaveho), FUN
+= max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahcta"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahcta")],by = list(tmp_financieros$llaveho), FUN
+= sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahcta"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahchqs")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahchqs"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahchqs")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahchqs"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahprv")],by = list(tmp_financieros$llaveho), FUN
+= max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahprv"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahprv")],by = list(tmp_financieros$llaveho), FUN
+= sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahprv"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahinvrs")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahinvrs"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahinvrs")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahinvrs"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahotro2")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahotro2"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahotro2")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahotro2"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahnompe")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahnompe"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahnompe")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahnompe"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahctago")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahctago"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahctago")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahctago"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahafore")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahafore"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahafore")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahafore"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahsegvi")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahsegvi"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahsegvi")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahsegvi"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("c_ahot18")],by = list(tmp_financieros$llaveho),
+FUN = max, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "c_ahot18"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+gpo1 <- aggregate(tmp_financieros[,c("v_ahot18")],by = list(tmp_financieros$llaveho),
+FUN = sum, na.rm=TRUE)
+colnames(gpo1)[colnames(gpo1) == "Group.1" ] <- "llaveho"
+colnames(gpo1)[colnames(gpo1) == "x" ] <- "v_ahot18"
+aux_financieros <- merge(aux_financieros, gpo1, by = "llaveho", all.x = T)
+
+# Verificar que están todas las columnas sin duplicados
+#cat("Dims aux_financieros:", dim(aux_financieros), "\n")
+#cat("Algún duplicado .x/.y:", any(grepl("\\.x$|\\.y$", names(aux_financieros))), "\n")
+```
+
+```{r}
+# ****Actualizo la informacion de activos financieros por hogar en la tabla concentradora del hogar (Tenenciay valor del instrumento)
+tmp_hogar1 <- merge(tmp_hogar1, aux_financieros, by = "llaveho", all.x = T)  # LlaveHO -> llaveho
+tmp_hogar1$c_ahcaja.x <- ifelse( tmp_hogar1$c_ahcaja.y == 1, 1,
+tmp_hogar1$c_ahcaja.x)
+tmp_hogar1$v_ahcaja.x <- ifelse( tmp_hogar1$c_ahcaja.y == 1, tmp_hogar1$v_ahcaja.y ,
+tmp_hogar1$v_ahcaja.x)
+tmp_hogar1$c_ahfami.x <- ifelse( tmp_hogar1$c_ahfami.y == 1, 1,
+tmp_hogar1$c_ahfami.x)
+tmp_hogar1$v_ahfami.x <- ifelse( tmp_hogar1$c_ahfami.y == 1, tmp_hogar1$v_ahfami.y ,
+tmp_hogar1$v_ahfami.x)
+tmp_hogar1$c_ahtanda.x <- ifelse( tmp_hogar1$c_ahtanda.y == 1, 1,
+tmp_hogar1$c_ahtanda.x)
+tmp_hogar1$v_ahtanda.x <- ifelse( tmp_hogar1$c_ahtanda.y == 1, tmp_hogar1$v_ahtanda.y,
+tmp_hogar1$v_ahtanda.x)
+tmp_hogar1$c_ahprest.x <- ifelse( tmp_hogar1$c_ahprest.y == 1, 1,
+tmp_hogar1$c_ahprest.x)
+tmp_hogar1$v_ahprest.x <- ifelse( tmp_hogar1$c_ahprest.y == 1, tmp_hogar1$v_ahprest.y,
+tmp_hogar1$v_ahprest.x)
+tmp_hogar1$c_ahotro1.x <- ifelse( tmp_hogar1$c_ahotro1.y == 1, 1,
+tmp_hogar1$c_ahotro1.x)
+tmp_hogar1$v_ahotro1.x <- ifelse( tmp_hogar1$c_ahotro1.y == 1, tmp_hogar1$v_ahotro1.y,
+tmp_hogar1$v_ahotro1.x)
+tmp_hogar1$c_ahcta.x <- ifelse( tmp_hogar1$c_ahcta.y == 1, 1,
+tmp_hogar1$c_ahcta.x)
+tmp_hogar1$v_ahcta.x <- ifelse( tmp_hogar1$c_ahcta.y == 1, tmp_hogar1$v_ahcta.y ,
+tmp_hogar1$v_ahcta.x)
+tmp_hogar1$c_ahchqs.x <- ifelse( tmp_hogar1$c_ahchqs.y == 1, 1,
+tmp_hogar1$c_ahchqs.x)
+tmp_hogar1$v_ahchqs.x <- ifelse( tmp_hogar1$c_ahchqs.y == 1, tmp_hogar1$v_ahchqs.y ,
+tmp_hogar1$v_ahchqs.x)
+tmp_hogar1$c_ahprv.x <- ifelse( tmp_hogar1$c_ahprv.y == 1, 1,
+tmp_hogar1$c_ahprv.x)
+tmp_hogar1$v_ahprv.x <- ifelse( tmp_hogar1$c_ahprv.y == 1, tmp_hogar1$v_ahprv.y ,
+tmp_hogar1$v_ahprv.x)
+tmp_hogar1$c_ahinvrs.x <- ifelse( tmp_hogar1$c_ahinvrs.y == 1, 1,
+tmp_hogar1$c_ahinvrs.x)
+tmp_hogar1$v_ahinvrs.x <- ifelse( tmp_hogar1$c_ahinvrs.y == 1, tmp_hogar1$v_ahinvrs.y,
+tmp_hogar1$v_ahinvrs.x)
+tmp_hogar1$c_ahotro2.x <- ifelse( tmp_hogar1$c_ahotro2.y == 1, 1,
+tmp_hogar1$c_ahotro2.x)
+tmp_hogar1$v_ahotro2.x <- ifelse( tmp_hogar1$c_ahotro2.y == 1, tmp_hogar1$v_ahotro2.y,
+tmp_hogar1$v_ahotro2.x)
+tmp_hogar1$c_ahnompe.x <- ifelse( tmp_hogar1$c_ahnompe.y == 1, 1,
+tmp_hogar1$c_ahnompe.x)
+tmp_hogar1$v_ahnompe.x <- ifelse( tmp_hogar1$c_ahnompe.y == 1, tmp_hogar1$v_ahnompe.y,
+tmp_hogar1$v_ahnompe.x)
+tmp_hogar1$c_ahctago.x <- ifelse( tmp_hogar1$c_ahctago.y == 1, 1,
+tmp_hogar1$c_ahctago.x)
+tmp_hogar1$v_ahctago.x <- ifelse( tmp_hogar1$c_ahctago.y == 1, tmp_hogar1$v_ahctago.y,
+tmp_hogar1$v_ahctago.x)
+tmp_hogar1$c_ahafore.x <- ifelse( tmp_hogar1$c_ahafore.y == 1, 1,
+tmp_hogar1$c_ahafore.x)
+tmp_hogar1$v_ahafore.x <- ifelse( tmp_hogar1$c_ahafore.y == 1, tmp_hogar1$v_ahafore.y,
+tmp_hogar1$v_ahafore.x)
+tmp_hogar1$c_ahsegvi.x <- ifelse( tmp_hogar1$c_ahsegvi.y == 1, 1,
+tmp_hogar1$c_ahsegvi.x)
+tmp_hogar1$v_ahsegvi.x <- ifelse( tmp_hogar1$c_ahsegvi.y == 1, tmp_hogar1$v_ahsegvi.y,
+tmp_hogar1$v_ahsegvi.x)
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahcaja.x" ] <- "c_ahcaja"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahcaja.x" ] <- "v_ahcaja"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahfami.x" ] <- "c_ahfami"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahfami.x" ] <- "v_ahfami"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahtanda.x"] <- "c_ahtanda"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahtanda.x"] <- "v_ahtanda"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahprest.x"] <- "c_ahprest"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahprest.x"] <- "v_ahprest"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahotro1.x"] <- "c_ahotro1"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahotro1.x"] <- "v_ahotro1"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahcta.x" ] <- "c_ahcta"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahcta.x" ] <- "v_ahcta"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahchqs.x" ] <- "c_ahchqs"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahchqs.x" ] <- "v_ahchqs"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahprv.x" ] <- "c_ahprv"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahprv.x" ] <- "v_ahprv"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahinvrs.x"] <- "c_ahinvrs"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahinvrs.x"] <- "v_ahinvrs"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahotro2.x"] <- "c_ahotro2"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahotro2.x"] <- "v_ahotro2"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahnompe.x"] <- "c_ahnompe"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahnompe.x"] <- "v_ahnompe"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahctago.x"] <- "c_ahctago"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahctago.x"] <- "v_ahctago"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahafore.x"] <- "c_ahafore"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahafore.x"] <- "v_ahafore"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahsegvi.x"] <- "c_ahsegvi"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahsegvi.x"] <- "v_ahsegvi"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_ahot18.x"] <- "c_ahot18"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "v_ahot18.x"] <- "v_ahot18"
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in%
+c("c_ahcaja.y","v_ahcaja.y","c_ahfami.y","v_ahfami.y",
+"c_ahtanda.y","v_ahtanda.y","c_ahprest.y","v_ahprest.y",
+"c_ahotro1.y","v_ahotro1.y","c_ahcta.y","v_ahcta.y","c_ahchqs.y",
+"v_ahchqs.y","c_ahprv.y","v_ahprv.y","c_ahinvrs.y","v_ahinvrs.y",
+"c_ahotro2.y","v_ahotro2.y","c_ahnompe.y","v_ahnompe.y","c_ahctago.y",
+"v_ahctago.y","c_ahafore.y","v_ahafore.y","c_ahsegvi.y","v_ahsegvi.y",
+"c_ahot18.y","v_ahot18.y")]                             
+```
+
+```{r}
+# **************************************************************************************
+# ***Agrupa los conceptos que desagregan los activos Financieros (Ref tabulado 18)
+tmp_hogar1$c_ctachqs <- ifelse(ifelse(is.na(tmp_hogar1$c_ahchqs), 0 ,
+tmp_hogar1$c_ahchqs) +
+ ifelse(is.na(tmp_hogar1$c_ahcta ), 0 , tmp_hogar1$c_ahcta
+) > 0, 1, 0)
+tmp_hogar1$v_ctachqs <- ifelse(is.na(tmp_hogar1$v_ahcta ), 0, tmp_hogar1$v_ahcta) +
+ ifelse(is.na(tmp_hogar1$v_ahchqs), 0, tmp_hogar1$v_ahchqs)
+tmp_hogar1$c_nompen <- tmp_hogar1$c_ahnompe
+tmp_hogar1$v_nompen <- tmp_hogar1$v_ahnompe
+tmp_hogar1$c_afore <- tmp_hogar1$c_ahafore
+tmp_hogar1$v_afore <- tmp_hogar1$v_ahafore
+tmp_hogar1$c_ctagob <- tmp_hogar1$c_ahctago
+tmp_hogar1$v_ctagob <- tmp_hogar1$v_ahctago
+tmp_hogar1$c_segvid <- tmp_hogar1$c_ahsegvi
+tmp_hogar1$v_segvid <- tmp_hogar1$v_ahsegvi
+tmp_hogar1$c_prvinvr <- ifelse(ifelse(is.na(tmp_hogar1$c_ahprv ), 0,
+tmp_hogar1$c_ahprv) +
+ ifelse(is.na(tmp_hogar1$c_ahinvrs), 0,
+tmp_hogar1$c_ahinvrs) >= 1, 1, 0)
+tmp_hogar1$v_prvinvr <- ifelse(is.na(tmp_hogar1$v_ahprv ), 0, tmp_hogar1$v_ahprv ) +
+ ifelse(is.na(tmp_hogar1$v_ahinvrs), 0, tmp_hogar1$v_ahinvrs)
+tmp_hogar1$c_otroaf <- ifelse(ifelse(is.na(tmp_hogar1$c_ahcaja ), 0,
+tmp_hogar1$c_ahcaja) +
+ ifelse(is.na(tmp_hogar1$c_ahfami ), 0,
+tmp_hogar1$c_ahfami) +
+ ifelse(is.na(tmp_hogar1$c_ahtanda), 0,
+tmp_hogar1$c_ahtanda) +
+ ifelse(is.na(tmp_hogar1$c_ahprest), 0,
+tmp_hogar1$c_ahprest) +
+ ifelse(is.na(tmp_hogar1$c_ahotro1), 0,
+tmp_hogar1$c_ahotro1) +
+ ifelse(is.na(tmp_hogar1$c_ahotro2), 0,
+tmp_hogar1$c_ahotro2) > 0, 1, 0)
+tmp_hogar1$v_otroaf <- ifelse(is.na(tmp_hogar1$v_ahcaja ), 0, tmp_hogar1$v_ahcaja ) +
+ ifelse(is.na(tmp_hogar1$v_ahfami ), 0, tmp_hogar1$v_ahfami ) +
+ifelse(is.na(tmp_hogar1$v_ahtanda), 0, tmp_hogar1$v_ahtanda) +
+ifelse(is.na(tmp_hogar1$v_ahprest), 0, tmp_hogar1$v_ahprest) +
+ifelse(is.na(tmp_hogar1$v_ahotro1), 0, tmp_hogar1$v_ahotro1) +
+ifelse(is.na(tmp_hogar1$v_ahotro2), 0, tmp_hogar1$v_ahotro2)
+# ***Obtengo hogares con activo Financiero y su valor
+tmp_hogar1$cacvo_fin <- ifelse(ifelse(is.na(tmp_hogar1$c_ctachqs), 0,
+tmp_hogar1$c_ctachqs) +
+ ifelse(is.na(tmp_hogar1$c_afore ), 0, tmp_hogar1$c_afore
+) +
+ ifelse(is.na(tmp_hogar1$c_nompen ), 0,
+tmp_hogar1$c_nompen ) +
+ ifelse(is.na(tmp_hogar1$c_ctagob ), 0,
+tmp_hogar1$c_ctagob ) +
+ ifelse(is.na(tmp_hogar1$c_segvid ), 0,
+tmp_hogar1$c_segvid ) +
+ ifelse(is.na(tmp_hogar1$c_prvinvr), 0,
+tmp_hogar1$c_prvinvr) +
+ ifelse(is.na(tmp_hogar1$c_otroaf ), 0,
+tmp_hogar1$c_otroaf ) > 0, 1, tmp_hogar1$cacvo_fin)
+tmp_hogar1$val_finan <- ifelse(is.na(tmp_hogar1$v_ctachqs), 0, tmp_hogar1$v_ctachqs) +
+ ifelse(is.na(tmp_hogar1$v_nompen ), 0, tmp_hogar1$v_nompen ) +
+ ifelse(is.na(tmp_hogar1$v_afore ), 0, tmp_hogar1$v_afore ) +
+ ifelse(is.na(tmp_hogar1$v_ctagob ), 0, tmp_hogar1$v_ctagob ) +
+ifelse(is.na(tmp_hogar1$v_segvid ), 0, tmp_hogar1$v_segvid ) +
+ ifelse(is.na(tmp_hogar1$v_prvinvr), 0, tmp_hogar1$v_prvinvr) +
+ ifelse(is.na(tmp_hogar1$v_otroaf ), 0, tmp_hogar1$v_otroaf )
+tmp_hogar1$aux1 <- tmp_hogar1$fac_hog * tmp_hogar1$cacvo_fin
+tmp_hogar1$aux2 <- tmp_hogar1$fac_hog * tmp_hogar1$val_finan
+gpo1 <- sum(aggregate(tmp_hogar1[,c("aux1")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)
+gpo2 <- sum(aggregate(tmp_hogar1[,c("aux2")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)/1000000
+nofinan <- rbind(nofinan, c(1, "+Activos Financieros", gpo1, gpo2))
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("aux1","aux2") ]
+
+```
+
+```{r}
+# *****************INICIO DE SECCION DE DEUDAS
+# **************************************************************************************
+# ****Tablas auxiliares para Limpieza y transformacion de
+tmp_deuda_vpal <- read.csv(file = "TVivienda.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_deuda_vpal$llavevi <- paste(tmp_deuda_vpal$folio, tmp_deuda_vpal$viv_sel, sep="")    # LlaveVI -> llavevi
+# Eliminar columnas innecesarias
+tmp_deuda_vpal <- tmp_deuda_vpal[, names(tmp_deuda_vpal) %in% c("llavevi", "p4_17",
+"p4_33", "p4_40", "p4_42") ]                                                            # LlaveVI -> llavevi
+tmp_deuda_vpal <- tmp_deuda_vpal[(tmp_deuda_vpal$p4_17 == "1" | tmp_deuda_vpal$p4_40 ==
+"1" ), ]
+tmp_deuda_vpal <- tmp_deuda_vpal[order(tmp_deuda_vpal$llavevi), ]                       # LlaveVI -> llavevi
+tmp_deuda_vsec <- read.csv(file = "TPropiedad.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_deuda_vsec$llavevi <- paste(tmp_deuda_vsec$folio, tmp_deuda_vsec$viv_sel, sep="")    # LlaveVI -> llavevi
+tmp_deuda_vsec$llaveho <- paste(tmp_deuda_vsec$folio, tmp_deuda_vsec$viv_sel,
+tmp_deuda_vsec$hogar, sep="")                                                           # LlaveHO -> llaveho
+# Eliminar columnas innecesarias
+tmp_deuda_vsec <- tmp_deuda_vsec[, names(tmp_deuda_vsec) %in% c("llavevi", "llaveho",
+"p5_12", "p5_16") ]                                                                     # LlaveVI/HO -> minúsculas
+tmp_deuda_vsec <- tmp_deuda_vsec[(tmp_deuda_vsec$p5_12 == "1" ), ]
+tmp_deuda_vsec <- tmp_deuda_vsec[order(tmp_deuda_vsec$llaveho), ]                       # LlaveHO -> llaveho
+tmp_deuda_t__deptal <- read.csv(file = "TDepar.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_deuda_t__deptal$llavevi <- paste(tmp_deuda_t__deptal$folio,
+tmp_deuda_t__deptal$viv_sel, sep="")                                                    # LlaveVI -> llavevi
+tmp_deuda_t__deptal$llaveho <- paste(tmp_deuda_t__deptal$folio,
+tmp_deuda_t__deptal$viv_sel, tmp_deuda_t__deptal$hogar, sep="")                         # LlaveHO -> llaveho
+# Eliminar columnas innecesarias
+tmp_deuda_t__deptal <- tmp_deuda_t__deptal[, names(tmp_deuda_t__deptal) %in%
+c("llavevi", "llaveho", "p8_15") ]                                                      # LlaveVI/HO -> minúsculas
+tmp_deuda_t__deptal <- tmp_deuda_t__deptal[order(tmp_deuda_t__deptal$llaveho), ]        # LlaveHO -> llaveho
+tmp_deuda_t_bnco <- read.csv(file = "TBanca.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_deuda_t_bnco$llavevi <- paste(tmp_deuda_t_bnco$folio, tmp_deuda_t_bnco$viv_sel,
+sep="")                                                                                  # LlaveVI -> llavevi
+tmp_deuda_t_bnco$llaveho <- paste(tmp_deuda_t_bnco$folio, tmp_deuda_t_bnco$viv_sel,
+tmp_deuda_t_bnco$hogar, sep="")                                                          # LlaveHO -> llaveho
+# Eliminar columnas innecesarias
+tmp_deuda_t_bnco <- tmp_deuda_t_bnco[, names(tmp_deuda_t_bnco) %in% c("llavevi",
+"llaveho", "p8_21") ]                                                                    # LlaveVI/HO -> minúsculas
+tmp_deuda_t_bnco <- tmp_deuda_t_bnco[order(tmp_deuda_t_bnco$llaveho), ]                 # LlaveHO -> llaveho
+```
+
+```{r}
+# ************* credito de vehiculos
+# Auto y Moto
+tmp_automoto <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_automoto$llavevi <- paste(tmp_automoto$folio, tmp_automoto$viv_sel, sep="")           # LlaveVI -> llavevi
+tmp_automoto$llaveho <- paste(tmp_automoto$folio, tmp_automoto$viv_sel,
+tmp_automoto$hogar, sep="")                                                              # LlaveHO -> llaveho
+tmp_automoto <- tmp_automoto[(tmp_automoto$p7_4_1 == "1" |
+ tmp_automoto$p7_4_2 == "1" |
+ifelse(gsub(" ", "", tmp_automoto$p7_5_1) == "", 0,
+as.integer(tmp_automoto$p7_5_1)) > 0 |
+ ifelse(gsub(" ", "", tmp_automoto$p7_5_2) == "", 0,
+as.integer(tmp_automoto$p7_5_2)) > 0), ]
+tmp_automoto$factor <- as.integer(tmp_automoto$factor)
+tmp_automoto <- aggregate(tmp_automoto[,c("factor")],by = list(tmp_automoto$llaveho),   # LlaveHO -> llaveho
+FUN = sum, na.rm=TRUE)
+colnames(tmp_automoto)[colnames(tmp_automoto) == "Group.1"] <- "llaveho"                # LlaveHO -> llaveho
+colnames(tmp_automoto)[colnames(tmp_automoto) == "x" ] <- "factor"
+gpo1 <- read.csv(file = "TModulo.csv", header=TRUE, sep=",", colClasses="character")
+gpo1$llaveho <- paste(gpo1$folio, gpo1$viv_sel, gpo1$hogar, sep="")                      # LlaveHO -> llaveho
+gpo1$uni <- 1
+gpo1 <- gpo1[gpo1$p7_4_1 == "1", ]
+gpo1 <- aggregate(gpo1[,c("uni")],by = list(gpo1$llaveho), FUN = sum, na.rm=TRUE)      # LlaveHO -> llaveho
+colnames(gpo1)[colnames(gpo1) == "Group.1"] <- "llaveho"                                # LlaveHO -> llaveho
+gpo1$p7_4_1 <- 1
+gpo2 <- read.csv(file = "TModulo.csv", header=TRUE, sep=",", colClasses="character")
+gpo2$llaveho <- paste(gpo2$folio, gpo2$viv_sel, gpo2$hogar, sep="")                      # LlaveHO -> llaveho
+gpo2$uni <- 1
+gpo2 <- gpo2[gpo2$p7_4_2 == "1", ]
+gpo2 <- aggregate(gpo2[,c("uni")],by = list(gpo2$llaveho), FUN = sum, na.rm=TRUE)      # LlaveHO -> llaveho
+colnames(gpo2)[colnames(gpo2) == "Group.1"] <- "llaveho"                                # LlaveHO -> llaveho
+gpo2$p7_4_2 <- 1
+tmp_automoto <- merge(tmp_automoto, gpo1, by = "llaveho", all.x = T)                   # LlaveHO -> llaveho
+tmp_automoto <- merge(tmp_automoto, gpo2, by = "llaveho", all.x = T)                   # LlaveHO -> llaveho
+tmp_automoto$p7_4_1 <- ifelse(is.na(tmp_automoto$p7_4_1), 0, 1)
+tmp_automoto$p7_4_2 <- ifelse(is.na(tmp_automoto$p7_4_2), 0, 1)
+tmp_automoto$p7_12 <- 0
+tmp_automoto$p7_21 <- 0
+# Eliminar columnas innecesarias
+tmp_automoto <- tmp_automoto[, names(tmp_automoto) %in% c("llavevi", "llaveho",        # LlaveVI/HO -> minúsculas
+"factor", "p7_4_1", "p7_4_2", "p7_12", "p7_21") ]
+#Solo Auto
+tmp_auto <- read.csv(file = "TAuto.csv", header=TRUE, sep=",", colClasses="character")
+tmp_auto$llaveho <- paste(tmp_auto$folio, tmp_auto$viv_sel, tmp_auto$hogar, sep="")      # LlaveHO -> llaveho
+tmp_auto$p7_12 <- as.integer(tmp_auto$p7_12)
+tmp_auto <- tmp_auto[(tmp_auto$p7_12 >= 1 & tmp_auto$p7_12 <= 9999887), ]
+tmp_auto <- aggregate(tmp_auto[,c("p7_12")], by=list("llaveho"=tmp_auto$llaveho), FUN = # LlaveHO -> llaveho
+sum, na.rm=TRUE)
+#Solo Moto
+tmp_moto <- read.csv(file = "TMoto.csv", header=TRUE, sep=",", colClasses="character")
+tmp_moto$llaveho <- paste(tmp_moto$folio, tmp_moto$viv_sel, tmp_moto$hogar, sep="")      # LlaveHO -> llaveho
+tmp_moto$p7_21 <- as.integer(tmp_moto$p7_21)
+tmp_moto <- tmp_moto[(tmp_moto$p7_21 >= 1 & tmp_moto$p7_21 <= 9999887), ]
+tmp_moto <- aggregate(tmp_moto[,c("p7_21")], by = list("llaveho"=tmp_moto$llaveho), FUN # LlaveHO -> llaveho
+= sum, na.rm=TRUE)
+tmp_automoto <- merge(tmp_automoto, tmp_auto, by="llaveho", all.x = T)                  # LlaveHO -> llaveho
+tmp_automoto <- merge(tmp_automoto, tmp_moto, by="llaveho", all.x = T)                  # LlaveHO -> llaveho
+tmp_automoto$p7_12 <- ifelse(is.na(tmp_automoto$x.x), 0, tmp_automoto$x.x)
+tmp_automoto$p7_21 <- ifelse(is.na(tmp_automoto$x.y), 0, tmp_automoto$x.y)
+tmp_automoto <- tmp_automoto[, !names(tmp_automoto) %in% c("x.x","x.y")]
+
+```
+
+```{r}
+# *****credito nomina/personal
+tmp_deuda_nomper <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_deuda_nomper$llaveho <- paste(tmp_deuda_nomper$folio, tmp_deuda_nomper$viv_sel,
+tmp_deuda_nomper$hogar, sep="")                                                          # LlaveHO -> llaveho
+tmp_deuda_nomper <- tmp_deuda_nomper[(ifelse(gsub(" ", "", tmp_deuda_nomper$p8_9_3) ==
+"", 0, as.integer(tmp_deuda_nomper$p8_9_3)) > 0 |
+ ifelse(gsub(" ", "", tmp_deuda_nomper$p8_9_5) ==
+"", 0, as.integer(tmp_deuda_nomper$p8_9_5)) > 0), ]
+tmp_deuda_nomper$factor <- as.integer(tmp_deuda_nomper$factor)
+tmp_deuda_nomper <- aggregate(tmp_deuda_nomper[,c("factor")], by =
+list("llaveho"=tmp_deuda_nomper$llaveho), FUN = sum, na.rm=TRUE)                        # LlaveHO -> llaveho
+colnames(tmp_deuda_nomper)[colnames(tmp_deuda_nomper) == "x"] <- "factor"
+tmp_deuda_nomper$p8_25 <- 0
+tmp_deuda_nomper$p8_41 <- 0
+tmp_deuda_nomina <- read.csv(file = "TNomina.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_deuda_nomina$llaveho <- paste(tmp_deuda_nomina$folio, tmp_deuda_nomina$viv_sel,
+tmp_deuda_nomina$hogar, sep="")                                                          # LlaveHO -> llaveho
+tmp_deuda_nomina <- tmp_deuda_nomina[(ifelse(gsub(" ", "", tmp_deuda_nomina$p8_25) ==
+"", 0, as.integer(tmp_deuda_nomina$p8_25)) >= 1 &
+ ifelse(gsub(" ", "", tmp_deuda_nomina$p8_25) ==
+"", 0, as.integer(tmp_deuda_nomina$p8_25)) <= 999887), ]
+tmp_deuda_nomina$p8_25 <- as.integer(tmp_deuda_nomina$p8_25)
+tmp_deuda_nomina <- aggregate(tmp_deuda_nomina[,c("p8_25")], by =
+list("llaveho"=tmp_deuda_nomina$llaveho), FUN = sum, na.rm=TRUE)                        # LlaveHO -> llaveho
+colnames(tmp_deuda_nomina)[colnames(tmp_deuda_nomina) == "x"] <- "p8_25"
+tmp_deuda_personal <- read.csv(file = "TPersonal.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_deuda_personal$llaveho <- paste(tmp_deuda_personal$folio, tmp_deuda_personal$viv_sel,
+tmp_deuda_personal$hogar, sep="")                                                        # LlaveHO -> llaveho
+tmp_deuda_personal <- tmp_deuda_personal[(ifelse(gsub(" ", "", tmp_deuda_personal$p8_41)
+== "", 0, as.integer(tmp_deuda_personal$p8_41)) >= 1 &
+ ifelse(gsub(" ", "", tmp_deuda_personal$p8_41)
+== "", 0, as.integer(tmp_deuda_personal$p8_41)) <= 999887), ]
+tmp_deuda_personal$p8_41 <- as.integer(tmp_deuda_personal$p8_41)
+tmp_deuda_personal <- aggregate(tmp_deuda_personal[,c("p8_41")], by =
+list("llaveho"=tmp_deuda_personal$llaveho), FUN = sum, na.rm=TRUE)                      # LlaveHO -> llaveho
+colnames(tmp_deuda_personal)[colnames(tmp_deuda_personal) == "x"] <- "p8_41"
+tmp_deuda_nomper <- merge(tmp_deuda_nomper, tmp_deuda_nomina , by="llaveho", all.x = T) # LlaveHO -> llaveho
+tmp_deuda_nomper <- merge(tmp_deuda_nomper, tmp_deuda_personal, by="llaveho", all.x = T)# LlaveHO -> llaveho
+tmp_deuda_nomper$p8_25.x <- ifelse(is.na(tmp_deuda_nomper$p8_25.y), 0,
+tmp_deuda_nomper$p8_25.y)
+tmp_deuda_nomper$p8_41.x <- ifelse(is.na(tmp_deuda_nomper$p8_41.y), 0,
+tmp_deuda_nomper$p8_41.y)
+colnames(tmp_deuda_nomper)[colnames(tmp_deuda_nomper) == "p8_25.x"] <- "p8_25"
+colnames(tmp_deuda_nomper)[colnames(tmp_deuda_nomper) == "p8_41.x"] <- "p8_41"
+tmp_deuda_nomper <- tmp_deuda_nomper[, !names(tmp_deuda_nomper) %in%
+c("p8_25.y","p8_41.y")]
+
+```
+
+```{r}
+# *****credito grupal
+tmp_grupal <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_grupal <- tmp_grupal[( tmp_grupal$p8_8_6 == "1" ), ]
+tmp_grupal$llaveho <- paste(tmp_grupal$folio, tmp_grupal$viv_sel, tmp_grupal$hogar,
+sep="")                                                                                  # LlaveHO -> llaveho
+tmp_grupal$factor <- as.integer(tmp_grupal$factor)
+tmp_grupal <- aggregate(tmp_grupal[,c("factor")], by =
+list("llaveho"=tmp_grupal$llaveho), FUN = sum, na.rm=TRUE)                              # LlaveHO -> llaveho
+colnames(tmp_grupal)[colnames(tmp_grupal) == "x"] <- "factor"
+tmp_grupal$p8_8_6 <- 1
+tmp_grupal$p8_49 <- 0
+aux_grupal <- read.csv(file = "TGrupal.csv", header=TRUE, sep=",",
+colClasses="character")
+aux_grupal$p8_49 <- as.integer(aux_grupal$p8_49)
+aux_grupal <- aux_grupal[( aux_grupal$p8_49 >= 1 & aux_grupal$p8_49 <= 999887 ), ]
+aux_grupal$llaveho <- paste(aux_grupal$folio, aux_grupal$viv_sel, aux_grupal$hogar,
+sep="")                                                                                  # LlaveHO -> llaveho
+aux_grupal <- aggregate(aux_grupal[,c("p8_49")], by =
+list("llaveho"=aux_grupal$llaveho), FUN = sum, na.rm=TRUE)                              # LlaveHO -> llaveho
+colnames(aux_grupal)[colnames(aux_grupal) == "x"] <- "p8_49"
+tmp_grupal <- merge(tmp_grupal, aux_grupal, by = "llaveho", all.x = T)                  # LlaveHO -> llaveho
+tmp_grupal$p8_49.x <- ifelse(is.na(tmp_grupal$p8_49.y), 0, tmp_grupal$p8_49.y)
+colnames(tmp_grupal)[colnames(tmp_grupal) == "p8_49.x"] <- "p8_49"
+tmp_grupal <- tmp_grupal[, !names(tmp_grupal) %in% c("p8_49.y")]
+# *****credito edicativo
+tmp_educativo <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_educativo <- tmp_educativo[( tmp_educativo$p8_9_4 == "1" ), ]
+tmp_educativo$llaveho <- paste(tmp_educativo$folio, tmp_educativo$viv_sel,
+tmp_educativo$hogar, sep="")                                                             # LlaveHO -> llaveho
+tmp_educativo$factor <- as.integer(tmp_educativo$factor)
+tmp_educativo <- aggregate(tmp_educativo[,c("factor")], by =
+list("llaveho"=tmp_educativo$llaveho), FUN = sum, na.rm=TRUE)                           # LlaveHO -> llaveho
+colnames(tmp_educativo)[colnames(tmp_educativo) == "x"] <- "factor"
+tmp_educativo$p8_9_4 <- 1
+tmp_educativo$p8_34 <- 0
+aux_educativo <- read.csv(file = "TEduca.csv", header=TRUE, sep=",",
+colClasses="character")
+aux_educativo$p8_34 <- as.integer(aux_educativo$p8_34)
+aux_educativo <- aux_educativo[( aux_educativo$p8_34 >= 1 & aux_educativo$p8_34 <=
+999887 ), ]
+aux_educativo$llaveho <- paste(aux_educativo$folio, aux_educativo$viv_sel,
+aux_educativo$hogar, sep="")                                                             # LlaveHO -> llaveho
+aux_educativo <- aggregate(aux_educativo[,c("p8_34")], by =
+list("llaveho"=aux_educativo$llaveho), FUN = sum, na.rm=TRUE)                           # LlaveHO -> llaveho
+colnames(aux_educativo)[colnames(aux_educativo) == "x"] <- "p8_34"
+tmp_educativo <- merge(tmp_educativo, aux_educativo, by = "llaveho", all.x = T)         # LlaveHO -> llaveho
+tmp_educativo$p8_34.x <- ifelse(is.na(tmp_educativo$p8_34.y), 0, tmp_educativo$p8_34.y)
+colnames(tmp_educativo)[colnames(tmp_educativo) == "p8_34.x"] <- "p8_34"
+tmp_educativo <- tmp_educativo[, !names(tmp_educativo) %in% c("p8_34.y")]
+```
+
+```{r}
+# *****credito Bienes productivos
+tmp_cred_agricola <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_cred_agricola <- tmp_cred_agricola[( tmp_cred_agricola$p6_25 == "1" ), ]
+tmp_cred_agricola$llaveho <- paste(tmp_cred_agricola$folio, tmp_cred_agricola$viv_sel,
+tmp_cred_agricola$hogar, sep="")                                                         # LlaveHO -> llaveho
+tmp_cred_agricola$p6_27 <- as.integer(tmp_cred_agricola$p6_27)
+tmp_cred_agricola <- aggregate(tmp_cred_agricola[,c("p6_27")], by =
+list("llaveho"=tmp_cred_agricola$llaveho), FUN = sum, na.rm=TRUE)                       # LlaveHO -> llaveho
+colnames(tmp_cred_agricola)[colnames(tmp_cred_agricola) == "x"] <- "p6_27"
+tmp_cred_agricola$p6_25 <- 1
+# ******Credito Negocio
+tmp_cred_neg <- read.csv(file = "TUnico.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_cred_neg <- tmp_cred_neg[( tmp_cred_neg$p6_11 == "1" ), ]
+tmp_cred_neg$p6_17 <- ifelse(as.integer(tmp_cred_neg$p6_17) >= 1 &
+as.integer(tmp_cred_neg$p6_17) <= 9999887, as.integer(tmp_cred_neg$p6_17), 0)
+tmp_cred_neg$llaveho <- paste(tmp_cred_neg$folio, tmp_cred_neg$viv_sel,
+tmp_cred_neg$hogar, sep="")                                                              # LlaveHO -> llaveho
+tmp_cred_neg <- aggregate(tmp_cred_neg[,c("p6_17")], by =
+list("llaveho"=tmp_cred_neg$llaveho), FUN = sum, na.rm=TRUE)                            # LlaveHO -> llaveho
+colnames(tmp_cred_neg)[colnames(tmp_cred_neg) == "x"] <- "p6_17"
+tmp_cred_neg$p6_11 <- 1
+#********Créditos_informales
+tmp_cred_Ot2 <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_cred_Ot2 <- tmp_cred_Ot2[( tmp_cred_Ot2$p8_1_1 == "1" | tmp_cred_Ot2$p8_1_2 == "1" |
+tmp_cred_Ot2$p8_1_3 == "1" | tmp_cred_Ot2$p8_1_4 == "1" ), ]
+tmp_cred_Ot2$llaveho <- paste(tmp_cred_Ot2$folio, tmp_cred_Ot2$viv_sel,
+tmp_cred_Ot2$hogar, sep="")                                                              # LlaveHO -> llaveho
+tmp_cred_Ot2$p8_4_1 <- ifelse(as.integer(tmp_cred_Ot2$p8_4_1) >= 1 &
+as.integer(tmp_cred_Ot2$p8_4_1) <= 999887, as.integer(tmp_cred_Ot2$p8_4_1), 0)
+tmp_cred_Ot2$p8_4_2 <- ifelse(as.integer(tmp_cred_Ot2$p8_4_2) >= 1 &
+as.integer(tmp_cred_Ot2$p8_4_2) <= 999887, as.integer(tmp_cred_Ot2$p8_4_2), 0)
+tmp_cred_Ot2$p8_4_3 <- ifelse(as.integer(tmp_cred_Ot2$p8_4_3) >= 1 &
+as.integer(tmp_cred_Ot2$p8_4_3) <= 999887, as.integer(tmp_cred_Ot2$p8_4_3), 0)
+tmp_cred_Ot2$p8_4_4 <- ifelse(as.integer(tmp_cred_Ot2$p8_4_4) >= 1 &
+as.integer(tmp_cred_Ot2$p8_4_4) <= 999887, as.integer(tmp_cred_Ot2$p8_4_4), 0)
+tmp_cred_Ot2 <- aggregate(tmp_cred_Ot2[,c("p8_4_1", "p8_4_2", "p8_4_3", "p8_4_4")], by =
+list("llaveho"=tmp_cred_Ot2$llaveho), FUN = sum, na.rm=TRUE)                            # LlaveHO -> llaveho
+tmp_cred_Ot2$cred_inf <- 1
+# ********Créditos_informales Asociados a la vivienda
+tmp_cred_Ot1 <- read.csv(file = "TVivienda.csv", header=TRUE, sep=",",
+colClasses="character")
+tmp_cred_Ot1 <- tmp_cred_Ot1[( tmp_cred_Ot1$p4_43_1 == "1" | tmp_cred_Ot1$p4_43_2 == "1"
+| tmp_cred_Ot1$p4_43_3 == "1" | tmp_cred_Ot1$p4_43_4 == "1" | tmp_cred_Ot1$p4_51 ==
+"1"), ]
+tmp_cred_Ot1$llavevi <- paste(tmp_cred_Ot1$folio, tmp_cred_Ot1$viv_sel, sep="")          # LlaveVI -> llavevi
+# Eliminar columnas innecesarias
+tmp_cred_Ot1 <- tmp_cred_Ot1[, names(tmp_cred_Ot1) %in% c("llavevi", "p4_43_1",       # LlaveVI -> llavevi
+"p4_46_1", "p4_43_2", "p4_46_2", "p4_43_3", "p4_46_3", "p4_43_4", "p4_46_4", "p4_51",
+"p4_54") ]
+tmp_cred_Ot1$cred_inf_v <- 1
+
+```
+
+```{r}
+# ********************************************************
+# **** Deuda
+# Eliminar p4_33 y p4_42 si ya existen de merges anteriores
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("p4_33", "p4_42", "p4_17", "p4_40")]
+tmp_deuda_vpal$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, tmp_deuda_vpal, by = "llavevi", all.x = T)
+tmp_hogar1$uni <- ifelse(is.na(tmp_hogar1$uni), 0, tmp_hogar1$uni)
+tmp_hogar1$ccred_vpal <- ifelse(tmp_hogar1$h_ppal == 1 & tmp_hogar1$uni == 1, 1, 0)
+tmp_hogar1$mnto_vpal <- ifelse(tmp_hogar1$h_ppal != 1 | tmp_hogar1$uni != 1 |
+is.na(tmp_hogar1$p4_33) | tmp_hogar1$p4_33 %in% c("999999888", "999999999"),
+0, as.integer(tmp_hogar1$p4_33)) +
+ ifelse(tmp_hogar1$h_ppal != 1 | tmp_hogar1$uni != 1 |
+is.na(tmp_hogar1$p4_42) | trimws(tmp_hogar1$p4_42) == "" |  # agregado trimws() == ""
+tmp_hogar1$p4_42 %in% c("999999888", "999999999"),
+0, as.integer(tmp_hogar1$p4_42))
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p4_17", "p4_40")]
+# *****Vivienda secundaria
+aux_deuda_vsec <- tmp_deuda_vsec
+aux_deuda_vsec$p5_16 <- as.integer(aux_deuda_vsec$p5_16)
+aux_deuda_vsec$p5_16 <- ifelse(aux_deuda_vsec$p5_16 %in% c(99999888, 99999999), 0,
+aux_deuda_vsec$p5_16)
+aux_deuda_vsec <- aggregate(aux_deuda_vsec[,c("p5_16")], by =
+list("llaveho"=aux_deuda_vsec$llaveho), FUN = sum, na.rm=TRUE)
+aux_deuda_vsec$ccred_vsec <- 1
+colnames(aux_deuda_vsec)[colnames(aux_deuda_vsec) == "x"] <- "mnto_vsec"
+tmp_hogar1 <- merge(tmp_hogar1, aux_deuda_vsec, by = "llaveho", all.x = T)
+tmp_hogar1$ccred_vsec.x <- ifelse(is.na(tmp_hogar1$ccred_vsec.y), 0, 1)
+tmp_hogar1$mnto_vsec.x <- ifelse(tmp_hogar1$ccred_vsec.x == 1, tmp_hogar1$mnto_vsec.y,
+0)
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "ccred_vsec.x"] <- "ccred_vsec"
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "mnto_vsec.x"] <- "mnto_vsec"
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("mnto_vsec.y","ccred_vsec.y")]
+# ***Credito Hipotecario credito de vivienda Principal + credito vivienda secundaria
+tmp_hogar1$cred_hip  <- ifelse(tmp_hogar1$ccred_vpal + tmp_hogar1$ccred_vsec > 0, 1, 0)
+tmp_hogar1$mto_hipot <- tmp_hogar1$mnto_vpal + tmp_hogar1$mnto_vsec
+# **********************************************
+# ***creditos Tarjeta bacaria y/o departamental
+# *** Departamental
+aux_deuda_t__deptal <- tmp_deuda_t__deptal
+aux_deuda_t__deptal$p8_15 <- as.integer(aux_deuda_t__deptal$p8_15)
+aux_deuda_t__deptal$p8_15 <- ifelse(aux_deuda_t__deptal$p8_15 %in% c(999888, 999999), 0,
+aux_deuda_t__deptal$p8_15)
+aux_deuda_t__deptal <- aggregate(aux_deuda_t__deptal[,c("p8_15")], by =
+list("llaveho"=aux_deuda_t__deptal$llaveho), FUN = sum, na.rm=TRUE)
+colnames(aux_deuda_t__deptal)[colnames(aux_deuda_t__deptal) == "x"] <- "mto_dept"
+aux_deuda_t__deptal$c_deptal <- 1
+tmp_hogar1 <- merge(tmp_hogar1, aux_deuda_t__deptal, by = "llaveho", all.x = T)
+tmp_hogar1$cred_tcrd <- ifelse(is.na(tmp_hogar1$c_deptal), 0, 1)
+tmp_hogar1$mto_dept <- ifelse(is.na(tmp_hogar1$mto_dept), 0, tmp_hogar1$mto_dept)
+tmp_hogar1$mto_tcrd <- ifelse(tmp_hogar1$cred_tcrd == 0 , 0, tmp_hogar1$mto_dept)
+# *** Bancaria
+aux_deuda_t_bnco <- tmp_deuda_t_bnco
+aux_deuda_t_bnco$p8_21 <- as.integer(aux_deuda_t_bnco$p8_21)
+aux_deuda_t_bnco$p8_21 <- ifelse(aux_deuda_t_bnco$p8_21 %in% c(999888, 999999), 0,
+aux_deuda_t_bnco$p8_21)
+aux_deuda_t_bnco <- aggregate(aux_deuda_t_bnco[,c("p8_21")], by =
+list("llaveho"=aux_deuda_t_bnco$llaveho), FUN = sum, na.rm=TRUE)
+colnames(aux_deuda_t_bnco)[colnames(aux_deuda_t_bnco) == "x"] <- "mto_bnc"
+aux_deuda_t_bnco$c_deptal <- 1
+tmp_hogar1 <- merge(tmp_hogar1, aux_deuda_t_bnco, by = "llaveho", all.x = T)
+tmp_hogar1$c_deptal.x <- ifelse(is.na(tmp_hogar1$c_deptal.x), 0, tmp_hogar1$c_deptal.x)
+tmp_hogar1$c_deptal.y <- ifelse(is.na(tmp_hogar1$c_deptal.y), 0, tmp_hogar1$c_deptal.y)
+tmp_hogar1$mto_bnc <- ifelse(is.na(tmp_hogar1$mto_bnc), 0, tmp_hogar1$mto_bnc)
+tmp_hogar1$cred_tcrd <- ifelse(tmp_hogar1$c_deptal.x == 1 | tmp_hogar1$c_deptal.y == 1
+, 1, 0)
+tmp_hogar1$mto_tcrd <- ifelse(tmp_hogar1$cred_tcrd == 1, tmp_hogar1$mto_tcrd +
+tmp_hogar1$mto_bnc, tmp_hogar1$mto_tcrd)
+colnames(tmp_hogar1)[colnames(tmp_hogar1) == "c_deptal.x"] <- "c_deptal"
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("c_deptal.y")]
+# **********************************************
+# ***creditos vehiculos
+tmp_automoto$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, tmp_automoto, by = "llaveho", all.x = T)
+tmp_hogar1$cred_aumo <- ifelse(tmp_hogar1$uni == 1, 1, tmp_hogar1$cred_aumo)
+tmp_hogar1$cred_aumo <- ifelse(is.na(tmp_hogar1$cred_aumo), 0, tmp_hogar1$cred_aumo)
+tmp_hogar1$mto_aumo <- ifelse(tmp_hogar1$uni == 1, tmp_hogar1$p7_12 + tmp_hogar1$p7_21,
+tmp_hogar1$cred_aumo)
+tmp_hogar1$mto_aumo <- ifelse(is.na(tmp_hogar1$mto_aumo), 0, tmp_hogar1$mto_aumo)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p7_4_1", "p7_4_2",
+"factor", "llavevi.y", "p7_12", "p7_21")]
+# **********************************************
+# ***creditos nomina y/o personal
+tmp_deuda_nomper$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, tmp_deuda_nomper, by = "llaveho", all.x = T)
+tmp_hogar1$cred_nmpe <- ifelse(tmp_hogar1$uni == 1, 1, tmp_hogar1$cred_nmpe)
+tmp_hogar1$mto_nmpe <- ifelse(tmp_hogar1$uni == 1, tmp_hogar1$p8_25 + tmp_hogar1$p8_41,
+tmp_hogar1$mto_nmpe)
+tmp_hogar1$cred_nmpe <- ifelse(is.na(tmp_hogar1$cred_nmpe), 0, tmp_hogar1$cred_nmpe)
+tmp_hogar1$mto_nmpe <- ifelse(is.na(tmp_hogar1$mto_nmpe ), 0, tmp_hogar1$mto_nmpe )
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p8_25", "p8_41",
+"factor", "x")]
+                              
+```
+
+```{r}
+# *****************************************************************
+# **** Otros créditos
+# ********** Creditos informales asociados a la vivienda Principal
+tmp_cred_Ot1$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, tmp_cred_Ot1, by = "llavevi", all.x = T)                # LlaveVI -> llavevi
+tmp_hogar1$uni <- ifelse(is.na(tmp_hogar1$uni ), 0, as.integer(tmp_hogar1$uni
+))
+tmp_hogar1$p4_43_1 <- ifelse(is.na(tmp_hogar1$p4_43_1 ), 0,
+as.integer(tmp_hogar1$p4_43_1 ))
+tmp_hogar1$p4_46_1 <- ifelse(is.na(tmp_hogar1$p4_46_1 ), 0,
+as.integer(tmp_hogar1$p4_46_1 ))
+tmp_hogar1$p4_43_2 <- ifelse(is.na(tmp_hogar1$p4_43_2 ), 0,
+as.integer(tmp_hogar1$p4_43_2 ))
+tmp_hogar1$p4_46_2 <- ifelse(is.na(tmp_hogar1$p4_46_2 ), 0,
+as.integer(tmp_hogar1$p4_46_2 ))
+tmp_hogar1$p4_43_3 <- ifelse(is.na(tmp_hogar1$p4_43_3 ), 0,
+as.integer(tmp_hogar1$p4_43_3 ))
+tmp_hogar1$p4_46_3 <- ifelse(is.na(tmp_hogar1$p4_46_3 ), 0,
+as.integer(tmp_hogar1$p4_46_3 ))
+tmp_hogar1$p4_43_4 <- ifelse(is.na(tmp_hogar1$p4_43_4 ), 0,
+as.integer(tmp_hogar1$p4_43_4 ))
+tmp_hogar1$p4_46_4 <- ifelse(is.na(tmp_hogar1$p4_46_4 ), 0,
+as.integer(tmp_hogar1$p4_46_4 ))
+tmp_hogar1$p4_51 <- ifelse(is.na(tmp_hogar1$p4_51 ), 0,
+as.integer(tmp_hogar1$p4_51 ))
+tmp_hogar1$p4_54 <- ifelse(is.na(tmp_hogar1$p4_54 ), 0,
+as.integer(tmp_hogar1$p4_54 ))
+tmp_hogar1$cred_inf_v <- ifelse(is.na(tmp_hogar1$cred_inf_v), 0,
+as.integer(tmp_hogar1$cred_inf_v))
+tmp_hogar1$p4_46_1 <- ifelse(!tmp_hogar1$p4_46_1 %in% c(0, 999999888, 999999999) &
+tmp_hogar1$h_ppal == 1 & tmp_hogar1$uni == 1, tmp_hogar1$p4_46_1, 0)
+tmp_hogar1$p4_46_2 <- ifelse(!tmp_hogar1$p4_46_2 %in% c(0, 9999888 , 9999999 ) &
+tmp_hogar1$h_ppal == 1 & tmp_hogar1$uni == 1, tmp_hogar1$p4_46_2, 0)
+tmp_hogar1$p4_46_3 <- ifelse(!tmp_hogar1$p4_46_3 %in% c(0, 999999888, 999999999) &
+tmp_hogar1$h_ppal == 1 & tmp_hogar1$uni == 1, tmp_hogar1$p4_46_3, 0)
+tmp_hogar1$p4_46_4 <- ifelse(!tmp_hogar1$p4_46_4 %in% c(0, 999999888, 999999999) &
+tmp_hogar1$h_ppal == 1 & tmp_hogar1$uni == 1, tmp_hogar1$p4_46_4, 0)
+tmp_hogar1$p4_54 <- ifelse(!tmp_hogar1$p4_54 %in% c(0, 999999888, 999999999) &
+tmp_hogar1$h_ppal == 1 & tmp_hogar1$uni == 1, tmp_hogar1$p4_54 , 0)
+tmp_hogar1$cred_rest <- ifelse(tmp_hogar1$h_ppal == 1 & tmp_hogar1$uni == 1, 1,
+tmp_hogar1$cred_rest)
+tmp_hogar1$mto_rest <- ifelse(tmp_hogar1$cred_rest == 1, tmp_hogar1$p4_46_1 +
+tmp_hogar1$p4_46_2 +
+ tmp_hogar1$p4_46_3 +
+tmp_hogar1$p4_46_4 +
+tmp_hogar1$p4_54,
+tmp_hogar1$mto_rest)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni","p4_43_1", "p4_46_1",
+"p4_43_2", "p4_46_2", "p4_43_3", "p4_46_3", "p4_43_4", "p4_46_4", "p4_51", "p4_54",
+"cred_inf_v")]
+# ********** Creditos grupal
+aux_grupal <- tmp_grupal
+aux_grupal$p8_49 <- ifelse(aux_grupal$p8_49 %in% c(999888,999999), 0, aux_grupal$p8_49)
+aux_grupal <- aggregate(aux_grupal[,c("p8_49")], by =
+list("llaveho"=aux_grupal$llaveho), FUN = sum, na.rm=TRUE)                              # LlaveHO -> llaveho
+colnames(aux_grupal)[colnames(aux_grupal) == "x"] <- "p8_49"
+aux_grupal$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, aux_grupal, by = "llaveho", all.x = T)                  # LlaveHO -> llaveho
+tmp_hogar1$uni <- ifelse(is.na(tmp_hogar1$uni ), 0, tmp_hogar1$uni )
+tmp_hogar1$p8_49 <- ifelse(is.na(tmp_hogar1$p8_49), 0, tmp_hogar1$p8_49)
+tmp_hogar1$cred_rest <- ifelse(tmp_hogar1$uni == 1 , 1, tmp_hogar1$cred_rest)
+tmp_hogar1$mto_rest <- ifelse(tmp_hogar1$uni == 1 , tmp_hogar1$mto_rest +
+tmp_hogar1$p8_49, tmp_hogar1$mto_rest)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p8_49")]
+# ********** Creditos educativo
+tmp_educativo$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, tmp_educativo, by = "llaveho", all.x = T)               # LlaveHO -> llaveho
+tmp_hogar1$uni <- ifelse(is.na(tmp_hogar1$uni ), 0, tmp_hogar1$uni )
+tmp_hogar1$p8_34 <- ifelse(is.na(tmp_hogar1$p8_34), 0, tmp_hogar1$p8_34)
+tmp_hogar1$cred_rest <- ifelse(tmp_hogar1$uni == 1 , 1, tmp_hogar1$cred_rest)
+tmp_hogar1$mto_rest <- ifelse(tmp_hogar1$uni == 1 , tmp_hogar1$mto_rest +
+tmp_hogar1$p8_34, tmp_hogar1$mto_rest)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p8_34")]
+# ********** otros Creditos
+tmp_cred_Ot2$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, tmp_cred_Ot2, by = "llaveho", all.x = T)                # LlaveHO -> llaveho
+tmp_hogar1$uni <- ifelse(is.na(tmp_hogar1$uni ), 0, tmp_hogar1$uni )
+tmp_hogar1$p8_4_1 <- ifelse(is.na(tmp_hogar1$p8_4_1), 0, tmp_hogar1$p8_4_1)
+tmp_hogar1$p8_4_2 <- ifelse(is.na(tmp_hogar1$p8_4_2), 0, tmp_hogar1$p8_4_2)
+tmp_hogar1$p8_4_3 <- ifelse(is.na(tmp_hogar1$p8_4_3), 0, tmp_hogar1$p8_4_3)
+tmp_hogar1$p8_4_4 <- ifelse(is.na(tmp_hogar1$p8_4_4), 0, tmp_hogar1$p8_4_4)
+tmp_hogar1$cred_rest <- ifelse(tmp_hogar1$uni == 1 , 1, tmp_hogar1$cred_rest)
+tmp_hogar1$mto_rest <- ifelse(tmp_hogar1$uni == 1 , tmp_hogar1$mto_rest +
+tmp_hogar1$p8_4_1 +
+ tmp_hogar1$p8_4_2 +
+tmp_hogar1$p8_4_3 + tmp_hogar1$p8_4_4, tmp_hogar1$mto_rest)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p8_4_1", "p8_4_2",
+"p8_4_3", "p8_4_4", "cred_inf")]
+```
+
+```{r}
+# ********** Credito Agricola
+tmp_cred_agricola$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, tmp_cred_agricola, by = "llaveho", all.x = T)           # LlaveHO -> llaveho
+tmp_hogar1$uni <- ifelse(is.na(tmp_hogar1$uni ), 0, tmp_hogar1$uni )
+tmp_hogar1$p6_27 <- ifelse(is.na(tmp_hogar1$p6_27), 0, tmp_hogar1$p6_27)
+tmp_hogar1$p6_27 <- ifelse(tmp_hogar1$p6_27 %in% c(9999888, 9999999), 0,
+tmp_hogar1$p6_27)
+tmp_hogar1$cred_rest <- ifelse(tmp_hogar1$uni == 1 , 1, tmp_hogar1$cred_rest)
+tmp_hogar1$mto_rest <- ifelse(tmp_hogar1$uni == 1 , tmp_hogar1$mto_rest +
+tmp_hogar1$p6_27, tmp_hogar1$mto_rest)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p6_25", "p6_27",
+"factor.y")]
+# ********** Credito Negocio
+aux_cred_neg <- tmp_cred_neg
+aux_cred_neg$p6_17 <- ifelse(aux_cred_neg$p6_17 %in% c(9999888, 9999999), 0,
+aux_cred_neg$p6_17)
+aux_cred_neg <- aggregate(tmp_cred_neg[,c("p6_17")], by =
+list("llaveho"=tmp_cred_neg$llaveho), FUN = sum, na.rm=TRUE)                            # LlaveHO -> llaveho
+colnames(aux_cred_neg)[colnames(aux_cred_neg) == "x"] <- "p6_17"
+aux_cred_neg$uni <- 1
+tmp_hogar1 <- merge(tmp_hogar1, aux_cred_neg, by = "llaveho", all.x = T)                # LlaveHO -> llaveho
+tmp_hogar1$uni <- ifelse(is.na(tmp_hogar1$uni ), 0, tmp_hogar1$uni )
+tmp_hogar1$p6_17 <- ifelse(is.na(tmp_hogar1$p6_17), 0, tmp_hogar1$p6_17)
+tmp_hogar1$cred_rest <- ifelse(tmp_hogar1$uni == 1 , 1, tmp_hogar1$cred_rest)
+tmp_hogar1$mto_rest <- ifelse(tmp_hogar1$uni == 1 , tmp_hogar1$mto_rest +
+tmp_hogar1$p6_17, tmp_hogar1$mto_rest)
+tmp_hogar1 <- tmp_hogar1[, !names(tmp_hogar1) %in% c("uni", "p6_17",
+"factor.x")]
+# ****************************
+# ****Hogares con credito No hipotecario
+tmp_hogar1$cred_nohip <- ifelse(tmp_hogar1$cred_tcrd + tmp_hogar1$cred_aumo +
+ tmp_hogar1$cred_nmpe + tmp_hogar1$cred_rest > 0, 1, 0)
+tmp_hogar1$mto_nohipo <- tmp_hogar1$mto_tcrd + tmp_hogar1$mto_aumo +
+ tmp_hogar1$mto_nmpe + tmp_hogar1$mto_rest
+# ****************************
+# ****Hogares con credito
+tmp_hogar1$cred_tot <- ifelse(tmp_hogar1$cred_hip + tmp_hogar1$cred_nohip > 0, 1, 0)
+tmp_hogar1$mto_ctot <- tmp_hogar1$mto_hipot + tmp_hogar1$mto_nohipo               # mto_nohip -> mto_nohipo (consistente con línea anterior)
+tmp_hogar1$aux1 <- tmp_hogar1$fac_hog * tmp_hogar1$cred_tot
+tmp_hogar1$aux2 <- tmp_hogar1$fac_hog * tmp_hogar1$mto_ctot
+gpo1 <- sum(aggregate(tmp_hogar1[,c("aux1")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)
+gpo2 <- sum(aggregate(tmp_hogar1[,c("aux2")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)/1000000
+nofinan <- rbind(nofinan, c(2, "-Deuda", gpo1, gpo2))                          
+```
+
+```{r, include=FALSE}
+# ******************************************************
+# ****Riqueza Neta
+tmp_hogar1$riq_net <- tmp_hogar1$val_nofin + tmp_hogar1$val_finan - tmp_hogar1$mto_ctot
+tmp_hogar1$tipo_riq <- ifelse(tmp_hogar1$riq_net < 0, 1, -1)
+tmp_hogar1$tipo_riq <- ifelse(tmp_hogar1$riq_net == 0, 2, tmp_hogar1$tipo_riq)
+tmp_hogar1$tipo_riq <- ifelse(tmp_hogar1$riq_net > 0, 3, tmp_hogar1$tipo_riq)
+tmp_hogar1$tipo_riq <- ifelse(tmp_hogar1$riq_net == 0 & tmp_hogar1$cacvo_nofn == 1 &
+ tmp_hogar1$val_nofin == 0 & tmp_hogar1$cacvo_fin == 1 &   # val_noFin -> val_nofin
+tmp_hogar1$val_finan == 0 & tmp_hogar1$cred_tot == 1 &
+tmp_hogar1$mto_ctot == 0, 0, tmp_hogar1$tipo_riq)
+tmp_hogar1$criq_net <- ifelse(tmp_hogar1$tipo_riq > 0, 1, 0)
+tmp_hogar1$aux1 <- tmp_hogar1$fac_hog * tmp_hogar1$criq_net
+tmp_hogar1$aux2 <- tmp_hogar1$fac_hog * tmp_hogar1$riq_net
+gpo1 <- sum(aggregate(tmp_hogar1[,c("aux1")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)
+gpo2 <- sum(aggregate(tmp_hogar1[,c("aux2")],by = list(tmp_hogar1$llaveho), FUN = sum,  # LlaveHO -> llaveho
+na.rm=TRUE)$x)/1000000
+nofinan <- rbind(nofinan, c(2, "=Riqueza Neta", gpo1, gpo2))
+nofinan
+```
+
+### (b) Tabule el nivel de riqueza neta de los hogares (usando el código que provee el INEGI), de acuerdo al tamaño de la localidad en la que radican.
+
+```{r, include=FALSE}
+# ============================================================
+# INCISO (b) - Tabulado de riqueza neta por tamaño de localidad
+# ============================================================
+
+# Etiquetas de tloc
+tmp_hogar1$tloc_label <- factor(tmp_hogar1$tloc,
+  levels = c("1", "2", "3", "4"),
+  labels = c("100,000 y más", "15,000 a 99,999",
+             "2,500 a 14,999", "Menor de 2,500"))
+
+# Tabulado
+tabulado_b <- tmp_hogar1 %>%
+  group_by(tloc_label) %>%
+  summarise(
+    hogares              = sum(fac_hog, na.rm=TRUE),
+    riq_net_millones     = sum(fac_hog * riq_net, na.rm=TRUE) / 1e6,
+    riq_net_media_pesos  = sum(fac_hog * riq_net, na.rm=TRUE) /
+                           sum(fac_hog, na.rm=TRUE)
+  ) %>%
+  arrange(tloc_label)
+
+print(tabulado_b)
+```
+
+```{r, results='asis'}
+tabulado_b %>%
+  mutate(
+    hogares             = scales::comma(hogares),
+    riq_net_millones    = scales::comma(round(riq_net_millones, 1)),
+    riq_net_media_pesos = scales::comma(round(riq_net_media_pesos, 0))
+  ) %>%
+  rename(
+    `Tamaño de localidad`                    = tloc_label,
+    `Hogares`                                = hogares,
+    `Riqueza neta total (millones de pesos)` = riq_net_millones,
+    `Riqueza neta media por hogar (pesos)`   = riq_net_media_pesos
+  ) %>%
+  knitr::kable(format = "latex", booktabs = TRUE, align = c("l","c","c","c"),
+               caption = "Nivel de riqueza neta de los hogares de acuerdo al tamaño de la localidad") %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"),
+                full_width = FALSE,
+                position = "center") %>%
+  footnote(general = "Fuente: Elaboración propia con datos de ENFIH 2019, INEGI.",
+           general_title = "",
+           footnote_as_chunk = TRUE) %>%
+  print()
+```
+
+
+### (c) Haga una gráfica de dispersión de la relación entre el ingreso corriente efectivo de los hogares y la riqueza neta. (Al respecto pudiera ser necesario tomar solamente una muestra de hogares.
+
+
+```{r}
+# ============================================================
+# INCISO (c) - Análisis por tamaño de localidad
+# ============================================================
+
+# Cargar tabla concentradora con ingreso
+tconcentradora <- read.csv(file = "TConcentradora.csv", header=TRUE, sep=",",
+                           colClasses="character")
+tconcentradora$llaveho <- paste(tconcentradora$folio, tconcentradora$viv_sel,
+                                tconcentradora$hogar, sep="")
+tconcentradora$ing_total <- as.numeric(tconcentradora$ing_total)
+
+# Pegar a tmp_hogar1
+tmp_hogar1 <- merge(tmp_hogar1,
+                    tconcentradora[, c("llaveho", "ing_total")],
+                    by = "llaveho", all.x = TRUE)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Filtrar correctamente antes de muestrear
+set.seed(123)
+muestra <- tmp_hogar1[
+  !is.na(tmp_hogar1$ing_total) & tmp_hogar1$ing_total > 0 &
+  !is.na(tmp_hogar1$riq_net)   & tmp_hogar1$riq_net   > 0 &
+  !is.na(tmp_hogar1$tloc)      & tmp_hogar1$tloc %in% c("1","2","3","4"), ]
+
+muestra$tloc_label <- factor(muestra$tloc,
+  levels = c("1","2","3","4"),
+  labels = c("100,000 y más","15,000 a 99,999","2,500 a 14,999","Menor de 2,500"))
+
+muestra <- muestra[sample(nrow(muestra), min(3000, nrow(muestra))), ]
+
+ggplot(muestra, aes(x = ing_total, y = riq_net)) +
+  geom_point(alpha = 0.3, size = 1.2, color = "grey50") +
+  scale_x_log10(labels = scales::comma) +
+  scale_y_log10(labels = scales::comma) +
+  geom_smooth(method = "lm", se = TRUE, color = "black",
+              fill = "grey80", linewidth = 0.8) +
+  facet_wrap(~ tloc_label, ncol = 2) +
+  labs(
+    title = "Relación entre ingreso corriente efectivo y riqueza neta",
+    subtitle = "Por tamaño de localidad (muestra de 3,000 hogares)",
+    x = "Ingreso corriente efectivo (pesos, escala log)",
+    y = "Riqueza neta (pesos, escala log)",
+    caption = "Fuente: Elaboración propia con datos de ENFIH 2019, INEGI"
+  ) +
+  theme_minimal() +
+  theme(
+   strip.text       = element_text(face = "bold"),
+  strip.background = element_rect(fill = "grey90", color = NA),
+  panel.grid.major = element_line(color = "grey90", linewidth = 0.3),
+  panel.grid.minor = element_line(color = "grey95", linewidth = 0.2),
+  plot.title       = element_text(hjust = 0.5),
+  plot.subtitle    = element_text(hjust = 0.5),
+  plot.caption     = element_text(hjust = 0.5)
+)
+```
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(muestra, aes(x = ing_total, y = riq_net)) +
+  geom_point(alpha = 0.3, size = 1.2, color = "grey50") +
+  scale_x_log10(labels = scales::comma) +
+  scale_y_log10(labels = scales::comma) +
+  geom_smooth(method = "lm", se = TRUE, color = "black",
+              fill = "grey80", linewidth = 0.8) +
+  labs(
+    title = "Relación entre ingreso corriente efectivo y riqueza neta",
+    subtitle = "Hogares con ingreso y riqueza positivos (muestra de 3,000 hogares)",
+    x = "Ingreso corriente efectivo (pesos, escala log)",
+    y = "Riqueza neta (pesos, escala log)",
+    caption = "Fuente: Elaboración propia con datos de ENFIH 2019, INEGI"
+  ) +
+  theme_light() +
+  theme(
+    plot.title    = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    plot.caption  = element_text(hjust = 0.5),
+    panel.grid.major = element_line(color = "grey90", linewidth = 0.3),
+    panel.grid.minor = element_line(color = "grey95", linewidth = 0.2)
+  )
+```
+
+### (d) Haga un tabulado de las respuestas sobre las forma en que atienden gastos imprevistos, de acuerdo al tamaño de la localidad en la que radican.
+
+```{r}
+# ============================================================
+# INCISO (D) - Gastos imprevistos
+# ============================================================
+# Cargar TModulo y agregar tloc
+tmodulo_imprev <- read.csv(file = "TModulo.csv", header=TRUE, sep=",",
+                           colClasses="character")
+tmodulo_imprev$llaveho <- paste(tmodulo_imprev$folio, tmodulo_imprev$viv_sel,
+                                tmodulo_imprev$hogar, sep="")
+
+# Verificar que existen las variables
+#grep("p11_1", names(tmodulo_imprev), value=TRUE)
+```
+
+```{r, include=FALSE}
+# Pegar tloc y fac_hog desde tmp_hogar1
+tmodulo_imprev <- merge(tmodulo_imprev,
+                        tmp_hogar1[, c("llaveho", "tloc_label", "fac_hog")],
+                        by = "llaveho", all.x = TRUE)
+
+# Convertir a numérico y calcular proporción de hogares que responden "Sí" (1)
+tmodulo_imprev$p11_1_1 <- as.integer(tmodulo_imprev$p11_1_1)
+tmodulo_imprev$p11_1_2 <- as.integer(tmodulo_imprev$p11_1_2)
+tmodulo_imprev$p11_1_3 <- as.integer(tmodulo_imprev$p11_1_3)
+tmodulo_imprev$p11_1_4 <- as.integer(tmodulo_imprev$p11_1_4)
+tmodulo_imprev$p11_1_5 <- as.integer(tmodulo_imprev$p11_1_5)
+tmodulo_imprev$p11_1_6 <- as.integer(tmodulo_imprev$p11_1_6)
+
+# Filtrar NAs de tloc
+tmodulo_imprev <- tmodulo_imprev[!is.na(tmodulo_imprev$tloc_label), ]
+
+# Tabulado por tamaño de localidad
+tabulado_d <- tmodulo_imprev %>%
+  group_by(tloc_label) %>%
+  summarise(
+    hogares          = sum(fac_hog, na.rm=TRUE),
+    ahorros          = sum(fac_hog[p11_1_1 == 1], na.rm=TRUE) / sum(fac_hog, na.rm=TRUE) * 100,
+    adelanto_sueldo  = sum(fac_hog[p11_1_2 == 1], na.rm=TRUE) / sum(fac_hog, na.rm=TRUE) * 100,
+    credito_bancario = sum(fac_hog[p11_1_3 == 1], na.rm=TRUE) / sum(fac_hog, na.rm=TRUE) * 100,
+    venta_empeno     = sum(fac_hog[p11_1_4 == 1], na.rm=TRUE) / sum(fac_hog, na.rm=TRUE) * 100,
+    prestamo_amigos  = sum(fac_hog[p11_1_5 == 1], na.rm=TRUE) / sum(fac_hog, na.rm=TRUE) * 100,
+    otros            = sum(fac_hog[p11_1_6 == 1], na.rm=TRUE) / sum(fac_hog, na.rm=TRUE) * 100
+  ) %>%
+  arrange(tloc_label)
+
+print(tabulado_d)
+```
+
+```{r, results='asis'}
+tabulado_d %>%
+  mutate(
+    hogares          = scales::comma(round(hogares, 0)),
+    ahorros          = paste0(round(ahorros, 1), "%"),
+    adelanto_sueldo  = paste0(round(adelanto_sueldo, 1), "%"),
+    credito_bancario = paste0(round(credito_bancario, 1), "%"),
+    venta_empeno     = paste0(round(venta_empeno, 1), "%"),
+    prestamo_amigos  = paste0(round(prestamo_amigos, 1), "%"),
+    otros            = paste0(round(otros, 1), "%")
+  ) %>%
+  rename(
+    `Tamaño de localidad`          = tloc_label,
+    `Hogares`                      = hogares,
+    `Ahorros`                      = ahorros,
+    `Adelanto de sueldo`           = adelanto_sueldo,
+    `Crédito bancario o tarjeta`   = credito_bancario,
+    `Venta o empeño de bien`       = venta_empeno,
+    `Préstamo de amigos/familiares`= prestamo_amigos,
+    `Otros`                        = otros
+  ) %>%
+  kable(format = "latex", booktabs = TRUE, 
+        align = c("l","c","c","c","c","c","c","c"),
+        caption = "Formas de atender gastos imprevistos por tamaño de localidad") %>%
+  kable_styling(latex_options = c("hold_position", "scale_down")) %>%
+  footnote(general = "Fuente: Elaboración propia con datos de ENFIH 2019, INEGI. Porcentaje de personas que responden Sí a cada opción.",
+           general_title = "",
+           footnote_as_chunk = TRUE) %>%
+  print()
+```
+
+### (e) Inteprete la gráfica y el tabulado.
+
+Pimeramente en el tabulado 1 "Nivel de riqueza neta de los hogares de acuerdo al tamaño de la localidad" es apreciable una clara relación positiva entre el tamaño de la localidad con la riqueza neta media de sus hogares, tendencia aún más evidente en la riqueza media total (esta segunda, siendo relativamente esperable debido a la densidad poblacional). 
+
+De manera similar, respecto a las gráficas de dispersión de riqueza neta versus ingreso corriente efectivo, estas muestran una relación directa entre el ingreso corriente y la riqueza neta, lo cual es bastante coherente con la teoría económica (mayor ingreso, mayor capacidad de ahorro e inversión, lo que se refleja en activos y riqueza). Asimismo, tanto en los gráficos correspondientes a tamaño de localidad como en el gráfico general se aprecia una dispersión considerable de los puntos, es decir, sin importar el tamaño de localidad es evidente una clara desigualdad social tanto en ingresos como en riqueza.
+
+Por último, respecto al tabulado 2 "Formas de atender gastos imprevistos por tamaño de localidad", todos los individuos muestran un comportamiento relativamente similar sin importar el tamaño de la localidad. Algo digno de ser destacado es el bajo porcentaje con el que la población recurre al crédito bancario o de tarjeta para atender gastos imprevistos, lo cual puede tener varias causas, como la baja confianza en instituciones bancarias o poco acceso al crédito, cualquiera que sea el caso esto puede tener grandes impacto en la inversión, productividad y el estándar de vida en general. Lo anterior se refleja con mayor claridad en la riqueza neta total (datos que a pesar de no ser solicitados en este inciso fue necesario su cálculo como base para la resolución del presente trabajo), en donde se aprecia una clara deficiencia de la riqueza procedente de activos financieros.
+
+
+
