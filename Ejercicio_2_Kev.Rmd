@@ -1,0 +1,1051 @@
+---
+title: "Ejercicio 2"
+author: "Kevin Mejía Rodríguez"
+date: "30 de marzo del 2026"
+output:
+  pdf_document:
+    toc: false
+  html_document:
+    toc: false
+header-includes:
+  - \pagenumbering{gobble}
+  - \usepackage{caption}
+  - \captionsetup[table]{labelformat=empty}
+---
+
+\newpage
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+
+```
+
+``` {r paqueterías, include=FALSE}
+# Cargamos librerías
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(
+  ggplot2,
+  dplyr,
+  tidyr,
+  broom,
+  knitr,
+  kableExtra,
+  zoo,
+  readr,
+  stringr,
+  seasonal,
+  x13binary,
+  scales,
+  lubridate
+)
+```
+
+## Ejercicio 2: Simulación de ingresos y consumo {-}
+
+El presente apartado aborda un ejercicio de simulación de una economía conformada
+por 20 agentes observados durante 30 periodos. En específico, se construye para cada agente un componente de ingreso permanente, un componente de ingreso 
+transitorio y un error de medición, esto con el fin de analizar cómo se relaciona el consumo con el ingreso total bajo distintos escenarios.
+
+Para realizar esta simulación, utilizaremos la descomposición del ingreso total en un componente permanente y uno transitorio. En particular, el ingreso total de cada individuo en cada periodo se define como la suma del ingreso permanente y el ingreso transitorio:
+
+$$
+Y_{i,t} = Y_i^P + Y_{i,t}^T
+$$
+
+Por su parte, el consumo se construye de acuerdo con la regla:
+
+$$
+C_{i,t} = Y_i^P + 0.1Y_{i,t}^T + e_{i,t}
+$$
+
+Esta especificación refleja la idea bajo la que se construye la hipótesis del ingreso permanente donde el consumo responde en mayor medida al ingreso permanente que al ingreso transitorio, dado que el aumento en una unidad del ingreso transitoriogenera solo un aumento de 0.1 unidades del consumo, mientras que la relación entre el ingreso permanente y el consumo es de uno a uno.
+
+\textbf{Parámetros de simulación}
+
+\vspace{0.1cm}
+
+Para la construcción de la simulación, se consideraron 20 personas y 30 periodos por individuo, generando una base de datos panel de 600 observaciones. El ingreso 
+permanente se simuló con media 10 y varianza $\sigma^P$, mientras que el ingreso 
+transitorio y el error de medición se generaron con media cero y varianzas $\sigma^T$ y $\sigma^\varepsilon$, respectivamente.
+
+Dado que los requerimientos de la tarea no fijan valores numéricos específicos para las varianzas, se seleccionó un conjunto inicial de valores positivos de forma discrecional con el propósito de construir una simulación base que se adaptara a las estimaciones solicitadas.
+
+En específico, se eligió una varianza de 4 para el ingreso permanente, debido a que
+se espera que el ingreso tenga una varianza menor que el componente transitorio.
+La varianza para el ingreso transitorio fue de 9 y para el error de 1.
+
+Posteriormente, estas varianzas se modifican sistemáticamente (por medio de una estimación utilizando promedios de la muestra) para estudiar su efecto sobre la pendiente estimada de la regresión entre consumo e ingreso total.
+
+
+``` {r parámetros base, include=FALSE}
+
+# Fijamos los parámetros base para la simulación
+set.seed(123) # Semilla
+
+# Dimensiones
+n_personas <- 20
+n_periodos <- 30
+
+# Parámetros base
+mu_P <- 10      # Media de la distribución
+var_P <- 4      # varianza del ingreso permanente
+var_T <- 9      # varianza del ingreso transitorio
+var_e <- 1      # varianza del error de medición
+
+sd_P <- sqrt(var_P)
+sd_T <- sqrt(var_T)
+sd_e <- sqrt(var_e)
+
+``` 
+
+``` {r función de simulación base, include=FALSE}
+
+# Conformamos la base
+simular_base <- function(n_personas = 20,
+                         n_periodos = 30,
+                         mu_P = 10,
+                         var_P = 4,
+                         var_T = 9,
+                         var_e = 1,
+                         semilla = NULL) {
+  
+  if (!is.null(semilla)) set.seed(semilla)
+  
+  sd_P <- sqrt(var_P)
+  sd_T <- sqrt(var_T)
+  sd_e <- sqrt(var_e)
+  
+  # (a) Ingreso permanente: un valor por persona
+  YP_persona <- rnorm(n_personas, mean = mu_P, sd = sd_P)
+  
+  # Base panel
+  base <- expand.grid(
+    persona = 1:n_personas,
+    tiempo = 1:n_periodos
+  ) %>%
+    arrange(persona, tiempo) %>%
+    mutate(
+      YP = rep(YP_persona, each = n_periodos),                      # Ingreso permanente
+      YT = rnorm(n_personas * n_periodos, mean = 0, sd = sd_T),    # Ingreso transitorio
+      Y  = YP + YT,                                                 # Ingreso total
+      e  = rnorm(n_personas * n_periodos, mean = 0, sd = sd_e),    # Error de medición
+      C  = YP + 0.1 * YT + e                                        # Consumo
+    )
+  
+  return(base)
+  
+  # View(base)
+}
+``` 
+
+``` {r simulación base, include=FALSE}
+
+# Generamos la base final
+base <- simular_base(
+  n_personas = n_personas,
+  n_periodos = n_periodos,
+  mu_P = mu_P,
+  var_P = var_P,
+  var_T = var_T,
+  var_e = var_e,
+  semilla = 123
+)
+
+head(base)
+
+``` 
+
+\textbf{(a) Simulación de ingresos permanentes}
+
+\vspace{0.1cm}
+
+A continuación presentamos los datos simulados de ingreso permanente, el cual representa la parte más estable y persistente del ingreso. De esta forma, las diferencias observadas entre personas reflejan heterogeneidad en su nivel de ingreso de largo plazo.
+
+Como podemos observar en la gráfica 1, los ingresos permanentes simulados muestran variación entre individuos, pero permanecen constantes para cada persona a lo largo de todos los periodos, lo que implica que las diferencias en este componente capturan desigualdades persistentes en el nivel de ingreso entre agentes, y no fluctuaciones de corto plazo.
+
+``` {r Ingresos permanentes, include=FALSE}
+
+YP_unico <- base %>%
+  group_by(persona) %>%
+  summarise(`Ingreso permanente` = first(YP))
+
+head(base) 
+
+kable(
+  YP_unico,
+  digits = 3,
+  caption = "\\centering Ingreso permanente por persona",
+  align = "c",
+  booktabs = TRUE,
+  format = "latex",
+  table.envir = "table"
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("HOLD_position", "scale_down"),
+    font_size = 8
+  ) |>
+  kableExtra::footnote(
+    general = "Fuente: Elaboración propia.",
+    general_title = "",
+    threeparttable = TRUE
+  )
+``` 
+
+``` {r Gráficas ingresos permanente, echo=FALSE, fig.width=6.5, fig.height=3.7}
+
+# Generamos la gráfica 
+
+YP_unico <- base %>%
+  group_by(persona) %>%
+  summarise(YP = first(YP), .groups = "drop")
+
+ggplot(YP_unico, aes(x = factor(persona), y = YP)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Gráfica 1: Ingreso permanente por persona",
+    subtitle = "Valor del ingreso permanente para cada persona",
+    x = "Persona",
+    y = "Ingreso permanente",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size=10
+    ),
+    panel.grid.minor = element_blank()
+  )
+
+``` 
+
+\textbf{(b) Simulación de ingresos transitorios}
+
+\vspace{0.1cm}
+
+A continuación presentamos el comportamiento de los ingresos transitorios simulados, los cuales representan las variaciones de corto plazo del ingreso total que no forman parte del ingreso permanente de cada individuo.
+
+``` {r Ingresos transitorios gráfica total, echo=FALSE, fig.width=7, fig.height=4.8}
+
+# Generamos la gráfica 
+ggplot(base, aes(x = tiempo, y = YT, group = persona, color = factor(persona))) +
+  geom_line(linewidth = 0.6) +
+  labs(
+    title = "Gráfica 2: Ingresos transitorios por persona y periodo",
+    subtitle = "Evolución del ingreso transitorio para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Ingreso transitorio",
+    color = "Persona",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size= 10
+    ),
+    panel.grid.minor = element_blank(),
+  legend.key.height = unit(0.35, "cm"),
+    legend.key.width = unit(0.35, "cm"),
+    legend.spacing.y = unit(0.05, "cm"),
+    legend.position = "right"
+  )
+``` 
+``` {r Ingresos transitorios gráfica dividida,echo=FALSE, fig.width=7, fig.height=5.5}
+
+# Generamos gráfica
+ggplot(base, aes(x = tiempo, y = YT, group = persona)) +
+  geom_line(linewidth = 0.6, color = "steelblue") +
+  facet_wrap(~ persona, nrow = 4, ncol = 5) +
+  labs(
+    title = "Gráfica 3: Ingresos transitorios por persona y periodo",
+    subtitle = "Evolución del ingreso transitorio para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Ingreso transitorio",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size = 10
+    ),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.title = element_text(size = 6, face = "bold"),
+    legend.text = element_text(size = 4),
+    legend.key.size = unit(0.2, "cm")
+  )
+
+
+```
+
+Como podemos observar en las gráficas 2 y 3, para las 20 personas y a lo largo de los 30 periodos, este componente oscila continuamente alrededor de cero, sin presentar una tendencia sistemática ni diferencias persistentes entre individuos. Esto es consistente con la forma en la que fue construida la base, ya que se trata de choques temporales que pueden ser positivos o negativos en cada periodo. 
+
+Para este caso, realizamos dos gráficas, la primera de ellas tomando todos los ingresos transitorios de forma agregada y la segunda de forma separada por individuo para observar de mejor forma el comportamiento individual de los ingresos transitorios por persona. En este sentido, en la gráfica conjunta (2) se observa una elevada variabilidad de corto plazo, mientras que en las gráficas individuales (gráfica 3) se aprecia con mayor claridad que estas fluctuaciones son irregulares y carecen de una tendencia.
+
+\textbf{(c) Simulación de Ingresos totales}
+
+\vspace{0.1cm}
+
+Finalmente, presentamos el ingreso total de cada individuo, el cual se construye con la suma de los dos componentes: el ingreso permanente y el ingreso transitorio. Por ello, el ingreso total combina tanto la heterogeneidad estructural entre individuos como la variabilidad de corto plazo de cada uno.
+
+Las gráficas 4 y 5 muestran que las trayectorias de cada persona oscilan alrededor de distintos niveles, lo cual refleja la presencia del componente permanente, pero al mismo tiempo presentan variaciones de un periodo a otro debido al componente transitorio. En la gráfica conjunta (4) se aprecia que, aunque todas las series fluctúan a lo largo del tiempo, no lo hacen alrededor del mismo valor, ya que cada individuo parte de un ingreso permanente distinto. Esto se observa con mayor claridad en los paneles individuales (gráfica 5), donde algunas personas mantienen niveles de ingreso total más altos y otras más bajos.
+
+``` {r Ingresos totales gráfica total, echo=FALSE, fig.width=7, fig.height=4.5}
+
+# Generamos la gráfica 
+ggplot(base, aes(x = tiempo, y = Y, group = persona, color = factor(persona))) +
+  geom_line(linewidth = 0.6) +
+  labs(
+    title = "Gráfica 4: Ingreso total por persona y periodo",
+    subtitle = "Evolución del ingreso total para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Ingreso total",
+    color = "Persona",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size = 10,
+    ),
+    panel.grid.minor = element_blank(),
+   legend.key.height = unit(0.35, "cm"),
+    legend.key.width = unit(0.35, "cm"),
+    legend.spacing.y = unit(0.05, "cm"),
+    legend.position = "right"
+  )
+
+
+``` 
+
+``` {r Ingresos totales gráfica dividida, echo=FALSE, fig.width=6.5, fig.height=4}
+
+# Generamos la gráfica
+ggplot(base, aes(x = tiempo, y = Y, group = persona)) +
+  geom_line(linewidth = 0.6, color = "steelblue") +
+  facet_wrap(~ persona, nrow = 4, ncol = 5) +
+  labs(
+    title = "Gráfica 5: Ingreso total por persona y periodo",
+    subtitle = "Evolución del ingreso total para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Ingreso total",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size = 10,
+    ),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+```
+
+\textbf{(d) Simulación de errores de medición}
+
+\vspace{0.1cm}
+
+En lo que respecta al error de medición, este representa un componente aleatorio que afecta al consumo sin corresponder a cambios en el ingreso permanente o transitorio. En la simulación, este término se genera con media cero y una varianza fija igual a uno, con el fin de introducir ruido adicional en la relación entre ingreso y consumo.
+
+``` {r Errores de medición total,echo=FALSE, fig.width=7, fig.height=4.3}
+
+# Generamos la gráfica 
+ggplot(base, aes(x = tiempo, y = e, group = persona, color = factor(persona))) +
+  geom_line(linewidth = 0.6) +
+  labs(
+    title = "Gráfica 6: Error de medición por persona y periodo",
+    subtitle = "Evolución del error de medición para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Error de medición",
+    color = "Persona",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size = 10
+    ),
+    panel.grid.minor = element_blank(),
+  legend.key.height = unit(0.35, "cm"),
+    legend.key.width = unit(0.35, "cm"),
+    legend.spacing.y = unit(0.05, "cm"),
+    legend.position = "right"
+  )
+
+``` 
+
+``` {r Errores de medición dividida, include=FALSE}
+
+# Generamos la gráfica
+ggplot(base, aes(x = tiempo, y = e, group = persona)) +
+  geom_line(linewidth = 0.6, color = "steelblue") +
+  facet_wrap(~ persona, nrow = 4, ncol = 5) +
+  labs(
+    title = "Error de medición por persona y periodo",
+    subtitle = "Evolución del error de medición para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Error de medición",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 14, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 11, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size=10,
+    ),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+``` 
+
+La gráfica 7 presenta un histograma de los errores de medición de la muestra, en la cual podemos observar que estos errores siguen una distribución normal.
+
+``` {r Errores de medición gráfica distribución, echo=FALSE, fig.width=6.5, fig.height=4}
+
+# Construimos la gráfica
+ggplot(base, aes(x = e)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "black", linewidth = 0.3) +
+  labs(
+    title = "Gráfica 7: Distribución del error de medición",
+    subtitle = "Histograma del error de medición en la muestra",
+    x = "Error de medición",
+    y = "Frecuencia",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size=10
+    ),
+    panel.grid.minor = element_blank()
+  )
+```
+
+\textbf{(e) Simulación de consumo}
+
+\vspace{0.1cm}
+
+Para poder realizar el análisis solicitado, además se calcula el consumo. Este se construye a partir del ingreso permanente, una fracción del ingreso transitorio y el error de medición. De esta forma, la simulación refleja la idea de que el consumo depende principalmente del componente permanente del ingreso y responde en menor medida a variaciones transitorias.
+
+Como se mencionó anteriormente, en este ejercicio construimos la variable consumo de acuerdo con la regla:
+
+$$
+C_{i,t} = Y_i^P + 0.1Y_{i,t}^T + e_{i,t}
+$$
+
+De esta forma, la simulación refleja la idea de que el consumo depende principalmente del componente permanente del ingreso y responde en menor medida a variaciones transitorias.
+
+Las gráficas 8 y 9 muestran que el consumo fluctúa a lo largo del tiempo, pero de manera más estable que el ingreso total, ya que está más vinculado al ingreso permanente de cada persona. 
+
+Aunque existen variaciones de corto plazo, estas son menores porque el componente transitorio afecta sólo parcialmente al consumo. En consecuencia, el consumo presenta una trayectoria relativamente más suave, lo que es consistente con la hipótesis del ingreso permanente.
+
+
+``` {r Consumo gráfica total, echo=FALSE, fig.width=7, fig.height=5}
+
+# Generamos la gráfica
+ggplot(base, aes(x = tiempo, y = C, group = persona, color = factor(persona))) +
+  geom_line(linewidth = 0.6) +
+  labs(
+    title = "Gráfica 8: Consumo por persona y periodo",
+    subtitle = "Evolución del consumo para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Consumo",
+    color = "Persona",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size = 10,
+    ),
+    panel.grid.minor = element_blank(),
+  legend.key.height = unit(0.35, "cm"),
+    legend.key.width = unit(0.35, "cm"),
+    legend.spacing.y = unit(0.05, "cm"),
+    legend.position = "right"
+  )
+
+```
+
+``` {r Consumo gráfica dividida, echo=FALSE, fig.width=6.5, fig.height=4}
+
+# Generamos la gráfica
+ggplot(base, aes(x = tiempo, y = C, group = persona)) +
+  geom_line(linewidth = 0.6, color = "steelblue") +
+  facet_wrap(~ persona, nrow = 4, ncol = 5) +
+  labs(
+    title = "Gráfica 9: Consumo por persona y periodo",
+    subtitle = "Evolución del consumo para cada persona a lo largo del tiempo",
+    x = "Periodo",
+    y = "Consumo",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size = 10,
+    ),
+    strip.text = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+```
+
+\textbf{(f) Estimación de la relación lineal entre el ingreso y consumo}
+
+\vspace{0.1cm}
+
+Con el objetivo de analizar la relación entre ingreso total y consumo (utilizando los datos encontrados a través de la simulación), estimamos mediante la metodología de mínimos cuadrados ordinarios la siguiente regresión lineal:
+
+$$
+C_{i,t} = \alpha + \beta Y_{i,t} + \varepsilon_{i,t}
+$$
+
+Esta especificación permite medir en qué magnitud cambia el consumo ante variaciones en el ingreso total observado. Dado que, por construcción, el consumo depende principalmente del ingreso permanente y sólo en una proporción menor del ingreso transitorio, se espera que la relación estimada entre ambas variables sea positiva, pero que la pendiente no sea igual a uno. En particular, como el ingreso total incorpora tanto un componente permanente como uno transitorio, mientras que el consumo responde fuertemente al primero y sólo débilmente al segundo, la pendiente estimada debe interpretarse como una respuesta promedio del consumo frente a cambios en el ingreso total.
+
+Los siguientes cuadros reúnen los coeficientes estimados de la regresión, así como sus respectivas medidas de ajuste.
+
+``` {r Estimación lineal entre el ingreso total y consumo, echo=FALSE, results='asis', fig.width=7, fig.height=4.5}
+
+# Estimación y tablas
+modelo <- lm(C ~ Y, data = base)
+
+# Tablas
+
+# Coeficientes estimados
+tabla_coef <- tidy(modelo)
+
+kable(
+  tabla_coef,
+  digits = 4,
+  caption = "\\centering Tabla 1: Coeficientes estimados de la regresión C - Y",
+  align = "c",
+  booktabs = TRUE,
+  format = "latex",
+  table.envir = "table"
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("HOLD_position", "scale_down"),
+    font_size = 8
+  ) |>
+  kableExtra::footnote(
+    general = "Fuente: Elaboración propia.",
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+```
+
+La tabla 1 muestra los parámetros de la regresión entre consumo e ingreso total. El intercepto estimado es 6.5229, lo que representa el nivel base de consumo predicho por la recta cuando el ingreso total es igual a cero. 
+
+Por su parte, el coeficiente asociado al ingreso total es 0.3672, lo que indica que, en promedio, cuando el ingreso total aumenta en una unidad, el consumo aumenta en 0.3672 unidades. El signo positivo confirma que existe una relación directa entre ambas variables, mientras que el que la pendiente sea menor que uno es consistente con la simulación: el consumo responde completamente al ingreso permanente, pero sólo parcialmente al ingreso transitorio. Además, los valores p prácticamente iguales a cero indican que ambos coeficientes son estadísticamente significativos.
+
+``` {r Estimación lineal entre el ingreso total y consumo: 2, echo=FALSE, fig.width=7, fig.height=4.5}
+
+# Tablas
+
+# Medidas de ajuste
+glance(modelo) %>%
+  select(r.squared, adj.r.squared, sigma, statistic, p.value) %>%
+  kable(
+    digits = 4,
+    caption = "\\centering Tabla 2: Medidas de ajuste del modelo",
+    align = "c",
+    booktabs = TRUE,
+    format = "latex",
+    table.envir = "table"
+  ) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("HOLD_position", "scale_down"),
+    font_size = 8
+  ) |>
+  kableExtra::footnote(
+    general = "Fuente: Elaboración propia.",
+    general_title = "",
+    threeparttable = TRUE
+  )
+```
+
+La tabla 2 resume qué tan bien se ajusta la regresión a los datos simulados. El valor de $R^2$ igual a 0.3609 indica que aproximadamente 36.09% de la variación observada en el consumo puede ser explicada por el ingreso total, mientras que el valor de $R^2$ ajustado es casi idéntico.
+
+Por su parte, $\sigma$ igual a 1.697 refleja el tamaño promedio de los residuos, es decir, la magnitud del error de predicción del modelo. Finalmente, el estadístico F es alto y su valor p es prácticamente cero, lo que confirma que el modelo en su conjunto es estadísticamente significativo.
+
+Para observar de mejor forma esta relación encontrada, a continuación presentamos un gráfico de dispersión y la relación lineal encontrada.
+
+``` {r Estimación lineal entre el ingreso total y consumo gráfica, echo=FALSE, fig.width=6.5, fig.height=4}
+
+# Gráficas
+ggplot(base, aes(x = Y, y = C)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "firebrick", linewidth = 0.9) +
+  labs(
+    title = "Gráfica 10: Relación entre ingreso total y consumo",
+    subtitle = "Asociación entre el ingreso total y el consumo en la muestra",
+    x = "Ingreso total",
+    y = "Consumo",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size=10
+    ),
+    panel.grid.minor = element_blank()
+  )
+
+```
+
+La gráfica 10 muestra la relación positiva entre el ingreso total y el consumo: conforme aumenta el ingreso total, el consumo tiende también a aumentar, situación representada en la pendiente ascendente de la recta. 
+
+Por último, la tabla 3 resume los principales parámetros de la regresión estimada. El intercepto de 6.5229 representa el nivel base de consumo predicho por el modelo cuando el ingreso total es cero, mientras que la pendiente estimada de 0.3672 indica que un incremento de una unidad en el ingreso total se asocia, en promedio, con un aumento de 0.3672 unidades en el consumo.
+
+``` {r Parámetros estimados, echo=FALSE, fig.width=7, fig.height=4.5}
+
+# Estimación de parámetros
+alpha_hat <- coef(modelo)[1]
+beta_hat  <- coef(modelo)[2]
+r2_hat    <- summary(modelo)$r.squared
+
+# Creamos tabla de resultados
+tabla_parametros <- tibble::tibble(
+  Parámetro = c("Intercepto estimado (alpha)", "Pendiente estimada (beta)", "R^2"),
+  Estimación = round(c(alpha_hat, beta_hat, r2_hat), 4)
+)
+
+kable(
+  tabla_parametros,
+  caption = "\\centering Tabla 3: Parámetros estimados del modelo",
+  align = "c",
+  booktabs = TRUE,
+  format = "latex",
+  table.envir = "table"
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("HOLD_position", "scale_down"),
+    font_size = 8
+  ) |>
+  kableExtra::footnote(
+    general = "Fuente: Elaboración propia.",
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+```
+
+\textbf{(g), (h) e (i) Relación entre pendiente estimada y varianzas}
+
+\vspace{0.1cm}
+
+Para profundizar en el análisis de la relación entre ingreso total y consumo, a continuación se presentan gráficas que recogen la relación entre la $\hat{\beta}$ en la regresión lineal y la varianza de los componentes del ingreso total. En específico, el propósito de este paso es entender cómo la relación estimada depende de que las fluctuaciones del ingreso provengan del componente permanente, del componente transitorio o del error de medición.
+
+La metodología para construir estas gráficas consiste en modificar una varianza a la vez y mantener constantes las demás. Para cada valor considerado, se repite la simulación varias veces y en cada repetición se vuelve a estimar la regresión entre consumo e ingreso total. Después, se calcula el promedio de las pendientes obtenidas. 
+
+Hacer esto permite que los resultados no dependan demasiado de la variación aleatoria de una sola simulación y ayuda a observar con mayor claridad cómo cambia la pendiente estimada cuando se altera cada componente del modelo. Por ello, las gráficas lucen más suavizadas. En las siguientes páginas se presentan las tres gráficas obtenidas.
+
+Primero presentamos la gráfica 11 sobre la relación entre $\hat{\beta}$ y la varianza del ingreso permanente ($\sigma_P^2$). La gráfica muestra una relación positiva entre la varianza del ingreso permanente y la pendiente estimada de la regresión entre consumo e ingreso total, dado que conforme aumenta la varianza del componente permanente, también aumenta el valor promedio de $\hat{\beta}$ aunque este incremento se vuelve más gradual en niveles altos de varianza.
+
+Este resultado es consistente con lo encontrado anteriormente, ya que cuando la varianza del ingreso permanente es baja, una proporción mayor de la variación del ingreso total proviene del componente transitorio. Dado que el consumo responde sólo de manera parcial a ese componente, la pendiente estimada entre consumo e ingreso total tiende a ser reducida.
+
+Posteriormente presentamos la gráfica 12 sobre la relación entre $\hat{\beta}$ y la varianza del ingreso transitorio ($\sigma_T^2$). En este caso, la gráfica muestra una relación negativa entre ambas variables: conforme aumenta la varianza del ingreso transitorio, disminuye el valor promedio de $\hat{\beta}$. Además, la caída es más pronunciada en los niveles bajos de varianza y después se vuelve más gradual.
+
+Este resultado también es consistente con la lógica de la simulación. Cuando la varianza del ingreso transitorio es reducida, una mayor parte de la variación del ingreso total sigue estando explicada por el componente permanente, por lo que la relación estimada entre ingreso y consumo es relativamente más alta.
+
+Finalmente, se presenta la gráfica 13 sobre la relación entre $\hat{\beta}$ y la varianza del error ($\sigma_e^2$). A diferencia de los dos casos anteriores, aquí no se observa una tendencia claramente creciente o decreciente. El valor promedio de la beta estimada se mantiene relativamente estable a lo largo de los distintos niveles de varianza del error, oscilando alrededor de un mismo nivel.
+
+Este comportamiento sugiere que aumentar la varianza del error de medición no modifica de forma sistemática la pendiente estimada de la relación entre consumo e ingreso total. La intuición es que este componente introduce ruido adicional en el consumo, pero no altera directamente la parte estructural de la relación entre ambas variables. 
+
+
+``` {r Estimar b, include=FALSE}
+
+# Función: obtiene una beta estimada a partir de una sola simulación
+obtener_beta_una_vez <- function(var_P, var_T, var_e) {
+  
+  datos <- simular_base(
+    n_personas = n_personas,
+    n_periodos = n_periodos,
+    mu_P = mu_P,
+    var_P = var_P,
+    var_T = var_T,
+    var_e = var_e,
+    semilla = NULL
+  )
+  
+  coef(lm(C ~ Y, data = datos))[2]
+}
+
+# Función general para ejercicios (g), (h) e (i)
+simular_sensibilidad <- function(parametro, valores, R = 200,
+                                 var_P_fijo = var_P,
+                                 var_T_fijo = var_T,
+                                 var_e_fijo = var_e) {
+  
+  resultados <- lapply(valores, function(v) {
+    
+    betas <- replicate(R, {
+      
+      if (parametro == "var_P") {
+        obtener_beta_una_vez(var_P = v, var_T = var_T_fijo, var_e = var_e_fijo)
+      } else if (parametro == "var_T") {
+        obtener_beta_una_vez(var_P = var_P_fijo, var_T = v, var_e = var_e_fijo)
+      } else if (parametro == "var_e") {
+        obtener_beta_una_vez(var_P = var_P_fijo, var_T = var_T_fijo, var_e = v)
+      }
+      
+    })
+    
+    data.frame(
+      valor = v,
+      beta_promedio = mean(betas),
+      beta_sd = sd(betas),
+      beta_min = min(betas),
+      beta_max = max(betas)
+    )
+  })
+  
+  bind_rows(resultados)
+}
+
+# Número de repeticiones por escenario
+R <- 200
+
+# Fijamos semilla una sola vez para todo el bloque
+set.seed(12345)
+
+``` 
+
+``` {r Estimar b 2, include = FALSE}
+
+# Inciso (g): beta vs varianza del ingreso permanente
+valores_varP <- seq(0.5, 20, by = 0.5)
+
+resultados_g <- simular_sensibilidad(
+  parametro = "var_P",
+  valores = valores_varP,
+  R = R,
+  var_T_fijo = var_T,
+  var_e_fijo = var_e
+)
+
+kable(
+  head(resultados_g, 10),
+  digits = 4,
+  caption = "\\centering Primeras observaciones: promedio de beta estimada y varianza del ingreso permanente",
+  align = "c",
+  booktabs = TRUE,
+  format = "latex",
+  table.envir = "table"
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("HOLD_position", "scale_down"),
+    font_size = 8
+  ) |>
+  kableExtra::footnote(
+    general = paste0("Fuente: Elaboración propia. Cada punto resume ", R, " simulaciones."),
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+
+``` 
+
+``` {r Estimar b 2 gráfica, echo=FALSE, fig.width=7, fig.height=4.5}
+
+ggplot(resultados_g, aes(x = valor, y = beta_promedio)) +
+  geom_line(color = "steelblue", linewidth = 0.9) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_ribbon(
+    aes(ymin = beta_promedio - beta_sd, ymax = beta_promedio + beta_sd),
+    fill = "steelblue", alpha = 0.15
+  ) +
+  labs(
+    title = "Gráfica 11: Relación entre beta estimada y varianza del ingreso permanente",
+    subtitle = "Promedio de la pendiente estimada y banda de ±1 desviación estándar",
+    x = expression(sigma[P]^2),
+    y = expression(bar(hat(beta))),
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size=10
+    ),
+    panel.grid.minor = element_blank()
+  )
+
+``` 
+
+``` {r Estimar b 3 , include=FALSE}
+
+# Inciso (h): beta vs varianza del ingreso transitorio
+valores_varT <- seq(0.5, 20, by = 0.5)
+
+resultados_h <- simular_sensibilidad(
+  parametro = "var_T",
+  valores = valores_varT,
+  R = R,
+  var_P_fijo = var_P,
+  var_e_fijo = var_e
+)
+
+kable(
+  head(resultados_h, 10),
+  digits = 4,
+  caption = "\\centering Primeras observaciones: promedio de beta estimada y varianza del ingreso transitorio",
+  align = "c",
+  booktabs = TRUE,
+  format = "latex",
+  table.envir = "table"
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("HOLD_position", "scale_down"),
+    font_size = 8
+  ) |>
+  kableExtra::footnote(
+    general = paste0("Fuente: Elaboración propia. Cada punto resume ", R, " simulaciones."),
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+``` 
+
+``` {r Estimar b 3 gráfica, echo=FALSE, fig.width=7, fig.height=4.5}
+
+ggplot(resultados_h, aes(x = valor, y = beta_promedio)) +
+  geom_line(color = "steelblue", linewidth = 0.9) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_ribbon(
+    aes(ymin = beta_promedio - beta_sd, ymax = beta_promedio + beta_sd),
+    fill = "steelblue", alpha = 0.15
+  ) +
+  labs(
+    title = "Gráfica 12: Relación entre beta estimada y varianza del ingreso transitorio",
+    subtitle = "Promedio de la pendiente estimada y banda de ±1 desviación estándar",
+    x = expression(sigma[T]^2),
+    y = expression(bar(hat(beta))),
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 11, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size=10
+    ),
+    panel.grid.minor = element_blank()
+  )
+
+``` 
+
+``` {r Estimar b 4, include = FALSE}
+
+# Inciso (i): beta vs varianza del error de medición
+valores_vare <- seq(0.5, 20, by = 0.5)
+
+resultados_i <- simular_sensibilidad(
+  parametro = "var_e",
+  valores = valores_vare,
+  R = R,
+  var_P_fijo = var_P,
+  var_T_fijo = var_T
+)
+
+kable(
+  head(resultados_i, 10),
+  digits = 4,
+  caption = "\\centering Primeras observaciones: promedio de beta estimada y varianza del error de medición",
+  align = "c",
+  booktabs = TRUE,
+  format = "latex",
+  table.envir = "table"
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("HOLD_position", "scale_down"),
+    font_size = 8
+  ) |>
+  kableExtra::footnote(
+    general = paste0("Fuente: Elaboración propia. Cada punto resume ", R, " simulaciones."),
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+``` 
+
+``` {r Estimar b 4 gráfica, echo=FALSE, fig.width=7, fig.height=4.5}
+
+ggplot(resultados_i, aes(x = valor, y = beta_promedio)) +
+  geom_line(color = "steelblue", linewidth = 0.9) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_ribbon(
+    aes(ymin = beta_promedio - beta_sd, ymax = beta_promedio + beta_sd),
+    fill = "steelblue", alpha = 0.15
+  ) +
+  labs(
+    title = "Gráfica 13: Relación entre beta estimada y varianza del error de medición",
+    subtitle = "Promedio de la pendiente estimada y banda de ±1 desviación estándar",
+    x = expression(sigma[epsilon]^2),
+    y = expression(bar(hat(beta))),
+    caption = "Fuente: Elaboración propia."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(
+      face = "bold", size=10
+    ),
+    panel.grid.minor = element_blank()
+  )
+
+``` 
+
+\textbf{Conclusión del ejercicio 2}
+
+\vspace{0.1cm}
+
+En conclusión, el ejercicio muestra de manera clara que la relación entre ingreso y consumo depende no sólo del nivel del ingreso total, sino también de su composición entre componentes permanentes y transitorios. La simulación confirma que el consumo responde principalmente a cambios persistentes en el ingreso y sólo de forma parcial a fluctuaciones temporales, lo que es consistente con la hipótesis del ingreso permanente. 
+
+Asimismo, la estimación lineal entre consumo e ingreso total arroja una relación positiva y estadísticamente significativa. En conjunto, los resultados permiten concluir que la estructura del ingreso es un elemento central para entender la forma con la que el consumo reacciona ante variaciones observadas en los recursos de los individuos.

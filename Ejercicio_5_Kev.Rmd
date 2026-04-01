@@ -1,0 +1,1027 @@
+---
+title: "Ejercicio 5"
+author: "Kevin Mejía Rodríguez"
+date: "30 de marzo del 2026"
+output:
+  pdf_document:
+    toc: false
+  html_document:
+    toc: false
+header-includes:
+  - \pagenumbering{gobble}
+  - \usepackage{caption}
+  - \captionsetup[table]{labelformat=empty}
+---
+
+\newpage
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+
+```
+
+``` {r paqueterías, include=FALSE}
+# Cargamos librerías
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(
+  ggplot2,
+  dplyr,
+  tidyr,
+  broom,
+  knitr,
+  kableExtra,
+  zoo,
+  readr,
+  stringr,
+  seasonal,
+  x13binary,
+  scales,
+  lubridate
+)
+```
+
+# Ejercicio 5: Consumo y sus determinantes {-}
+
+El presente ejercicio tiene como objetivo analizar el comportamiento reciente del consumo en México y examinar su relación con algunos de sus principales determinantes macroeconómicos, en particular el tipo de cambio y la tasa de interés real. Para ello, se construyó una base de datos con series trimestrales correspondientes al periodo 1994-2025, que abarca las variables macroeconómicas antes mencionadas así como el consumo dividido por el consumo de bienes nacionales, el consumo de bienes importados y el consumo agregado. 
+
+En cuanto a los datos, estos fueron obtenidos de dos fuentes: la página de Banco de México, en específico del Sistema de Información Económica del Banxico [https://www.banxico.org.mx/SieInternet/] y el Banco de Información Económica de INEGI [https://www.inegi.org.mx/app/indicadores/?tm=3]. La base incluye las siguientes variables:
+
+* Consumo privado: esta es la variable que utilizaremos como Consumo agregado, dado que incluye el Consumo privado en el mercado interior de origen nacional, el Consumo privado en el mercado interior de origen importado y Compras netas de residentes y no residentes.
+
+* Consumo privado en el mercado interior de origen nacional: esta será la variable que utilizaremos como Consumo agregado de bienes nacionales.
+
+* Consumo privado en el mercado interior de origen importado: esta será la variable que utilizaremos como Consumo agregado de bienes importados.
+
+* Tipo de cambio: se utilizó el tipo de cambio pesos por dólar estadounidense, para solventar obligaciones denominadas en moneda extranjera, Fecha de determinación (FIX) Cotizaciones promedio, con una periodicidad mensual y transformada a trimestral mediante el promedio simple de tres meses.
+
+* Tasa de interés real: para la construcción de esta variable se utilizó la tasa de interés nominal la TIIE a 28 días, tasa de interés promedio mensual, en por ciento anual. De igual forma, dado que esta variable tiene una periodicidad mensual, sus valores trimestrales fueron obtenidos mediante un promedio simple. Para obtener la tasa de interés real, se le restó el valor trimestral de la inflación en México a la serie trimestral de tasa de interés previamente construida.
+
+A continuación presentamos algunas gráficas conjuntas, con el objetivo de hacer una primera aproximación de comparación entre las variables macroeconómicas y los distintos consumos. Cabe señalar que para apreciar de forma gráfica las relaciones de estas variables con el consumo, en primera instancia tomaremos las series de consumo sin desestacionalizar, con el fin de observar en mayor medida el comportamiento de la variable en el tiempo. En ejercicios posteriores, desestacionalizaremos estas series.
+
+\textbf{(a) Datos trimestrales de consumo}
+
+\vspace{0.1cm}
+
+En primera instancia, con el objetivo de analizar el comportamiento del consumo en México, en este apartado se presentan las series trimestrales de consumo agregado, consumo de bienes nacionales y consumo de bienes importados. Esta primera revisión se realiza con las series en niveles, ya que ello permite identificar de manera general su tendencia, sus diferencias de magnitud y algunos episodios de contracción antes de proceder a su desestacionalización.
+
+Como se observa en la gráfica 1, las tres series muestran una trayectoria creciente de largo plazo, aunque con caídas importantes en periodos de choque, particularmente en 2009 y en 2020. Asimismo, el consumo agregado y el consumo de bienes nacionales siguen trayectorias muy similares, lo que indica que la evolución del consumo total está explicada principalmente por el componente nacional. Por su parte, el consumo de bienes importados presenta un nivel mucho menor, aunque también mantiene una tendencia ascendente y parece mostrar una mayor sensibilidad en los episodios de caída, posiblemente relacionado a impactos internacionales que afectan a esta parte del consumo total.
+
+```{r setup 1, include=FALSE}
+
+# Fijamos la ruta
+setwd("C:/Users/lina6/OneDrive/Documentos/T2_KMR")
+options(scipen = 999)
+
+
+# Función auxiliar para crear objetos ts trimestrales
+crear_ts_trimestral <- function(trimestres, valores) {
+  inicio_txt  <- as.character(trimestres[1])
+  anio_inicio <- as.integer(stringr::str_extract(inicio_txt, "^\\d{4}"))
+  trim_inicio <- as.integer(stringr::str_extract(inicio_txt, "(?<=Q)\\d"))
+
+  ts(
+    valores,
+    start = c(anio_inicio, trim_inicio),
+    frequency = 4
+  )
+}
+
+```
+
+```{r consumo, include=FALSE}
+
+# Leer archivo
+consumo_raw <- read_csv("Consumo.csv", show_col_types = FALSE)
+
+# Nos quedamos solo con el bloque de valores constantes 2018
+inicio_vc <- which(consumo_raw$Concepto == "VCts18 - Valores constantes 2018")[1]
+fin_vc    <- which(consumo_raw$Concepto == "Variación porcentual anual")[1] - 1
+
+consumo_vc <- consumo_raw %>%
+  slice(inicio_vc:fin_vc)
+
+# Seleccionamos las 3 series requeridas y construimos base trimestral
+series_objetivo <- c(
+  "a  CP - Consumo Privado",
+  "CP_mdo_int_nac - Consumo privado en el mercado interior de origen nacional",
+  "CP_mdo_int_imp - Consumo privado en el mercado interior de origen importado"
+)
+
+consumo_trim <- consumo_vc %>%
+  filter(Concepto %in% series_objetivo) %>%
+  mutate(
+    serie = recode(
+      Concepto,
+      "a  CP - Consumo Privado" = "Consumo agregado",
+      "CP_mdo_int_nac - Consumo privado en el mercado interior de origen nacional" = "Consumo de bienes nacionales",
+      "CP_mdo_int_imp - Consumo privado en el mercado interior de origen importado" = "Consumo de bienes importados"
+    )
+  ) %>%
+  select(serie, matches("^\\d{4}\\s*\\|\\s*T[1-4](\\s+[RP])?$")) %>%
+  pivot_longer(
+    cols = -serie,
+    names_to = "fecha_raw",
+    values_to = "valor"
+  ) %>%
+  extract(
+    fecha_raw,
+    into = c("anio", "trimestre_txt"),
+    regex = "^(\\d{4})\\s*\\|\\s*(T[1-4])"
+  ) %>%
+  mutate(
+    valor = parse_number(as.character(valor)),
+    trimestre = as.yearqtr(paste(anio, trimestre_txt), format = "%Y T%q")
+  ) %>%
+  filter(!is.na(valor)) %>%
+  select(trimestre, serie, valor) %>%
+  arrange(serie, trimestre)
+
+# Base para graficar niveles
+plot_consumo <- consumo_trim %>%
+  mutate(fecha = as.Date(trimestre))
+
+```
+
+```{r gráficas consumo, echo=FALSE, fig.width=6.5, fig.height=4}
+# Base para graficar niveles
+plot_consumo <- consumo_trim %>%
+  mutate(fecha = as.Date(trimestre))
+
+# Gráfica de las 3 series de consumo
+ggplot(plot_consumo, aes(x = fecha, y = valor, color = serie)) +
+  geom_line(linewidth = 0.8) +
+  labs(
+    title = "Gráfica 1: Consumo privado trimestral en México",
+    subtitle = "Consumo agregado, bienes nacionales y bienes importados",
+    x = "Trimestre",
+    y = "Monto total",
+    caption = "Fuente: Elaboración propia con datos de INEGI."
+  ) +
+  scale_color_manual(
+    values = c(
+      "Consumo agregado" = "steelblue",
+      "Consumo de bienes nacionales" = "firebrick",
+      "Consumo de bienes importados" = "forestgreen"
+    )
+  ) +
+  scale_x_date(
+    limits = c(min(plot_consumo$fecha, na.rm = TRUE), as.Date("2025-12-31")),
+    breaks = as.Date(c(
+      "1995-01-01", "2000-01-01", "2005-01-01",
+      "2010-01-01", "2015-01-01", "2020-01-01", "2025-01-01"
+    )),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 1)
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold", size = 8),
+    panel.grid.minor = element_blank(),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  )
+
+```
+
+```{r desestacionalizar consumo, include=FALSE}
+
+# Desestacionalizamos las 3 series
+desestacionalizar_consumo <- function(df_serie) {
+  ts_serie <- crear_ts_trimestral(df_serie$trimestre, df_serie$valor)
+  modelo   <- seas(ts_serie)
+  
+  serie_sa <- tibble(
+    trimestre = as.yearqtr(time(final(modelo))),
+    valor_sa  = as.numeric(final(modelo))
+  )
+  
+  df_serie %>%
+    left_join(serie_sa, by = "trimestre")
+}
+
+consumo_sa <- consumo_trim %>%
+  group_by(serie) %>%
+  group_modify(~ desestacionalizar_consumo(.x)) %>%
+  ungroup() %>%
+  mutate(fecha = as.Date(trimestre))
+
+```
+
+```{r desestacionalizar consumo gráficas, include=FALSE}
+
+# Gráfica de las 3 series desestacionalizadas
+ggplot(consumo_sa, aes(x = fecha, y = valor_sa, color = serie)) +
+  geom_line(linewidth = 0.8) +
+  labs(
+    title = "Consumo privado trimestral desestacionalizado en México",
+    subtitle = "Consumo agregado, bienes nacionales y bienes importados",
+    x = "Trimestre",
+    y = "Monto total desestacionalizado",
+    caption = "Fuente: Elaboración propia."
+  ) +
+  scale_color_manual(
+    values = c(
+      "Consumo agregado" = "steelblue",
+      "Consumo de bienes nacionales" = "firebrick",
+      "Consumo de bienes importados" = "forestgreen"
+    )
+  ) +
+  scale_x_date(
+    date_breaks = "4 years",
+    date_labels = "%Y",
+    limits = c(min(consumo_sa$fecha), as.Date("2025-12-31"))
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 1)
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 14, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  )
+
+```
+
+\textbf{(b) Variables macroeconómicas: tipo de cambio y tasa de interés real}
+
+\vspace{0.1cm}
+
+A continuación presentamos las gráfica 2 y 3 sobre el comportamiento de las dos variables que posteriormente relacionaremos con el consumo: la tasa de interés real y el tipo de cambio.
+
+```{r tipo de cambio, include=FALSE}
+
+# Leer archivo
+tc_raw <- read_csv(
+  "Tipo de cambio.csv",
+  skip = 18,
+  na = c("N/E", ""),
+  show_col_types = FALSE
+)
+
+# Limpiar base mensual
+tc_mensual <- tc_raw %>%
+  rename(fecha = Fecha) %>%
+  mutate(
+    fecha = dmy(fecha),
+    across(-fecha, ~ parse_number(as.character(.x)))
+  ) %>%
+  arrange(fecha)
+
+# 2.3 Construir base trimestral usando la serie FIX: SF17908
+tc_trim <- tc_mensual %>%
+  mutate(trimestre = as.yearqtr(fecha)) %>%
+  group_by(trimestre) %>%
+  summarise(
+    tipo_cambio = if (all(is.na(SF17908))) NA_real_ else mean(SF17908, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(trimestre)
+
+```
+
+```{r tipo de cambio gráfica,  echo=FALSE, fig.width=6.5, fig.height=4}
+plot_tc <- tc_trim %>%
+  filter(trimestre >= as.yearqtr("1994 Q1", format = "%Y Q%q")) %>%
+  mutate(fecha = as.Date(trimestre))
+
+# Gráfica de tipo de cambio
+ggplot(plot_tc, aes(x = fecha, y = tipo_cambio)) +
+  geom_line(linewidth = 0.8, color = "steelblue") +
+  labs(
+    title = "Gráfica 2: Tipo de cambio trimestral en México",
+    subtitle = "Promedio trimestral del tipo de cambio FIX",
+    x = "Trimestre",
+    y = "Pesos por dólar",
+    caption = "Fuente: Elaboración propia con datos de Banco de México."
+  ) +
+  scale_x_date(
+    limits = c(min(plot_tc$fecha, na.rm = TRUE), as.Date("2025-12-31")),
+    breaks = as.Date(c(
+      "1995-01-01", "2000-01-01", "2005-01-01",
+      "2010-01-01", "2015-01-01", "2020-01-01", "2025-01-01"
+    )),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 0.01)
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold", size = 8),
+    panel.grid.minor = element_blank(),
+    legend.position = "none"
+  )
+
+```
+
+Para el caso del tipo de cambio, la gráfica 2 muestra una tendencia ascendente de largo plazo del tipo de cambio trimestral en México, lo que refleja una depreciación gradual de la moneda nacional a lo largo del periodo analizado. No obstante, esta trayectoria no ha sido uniforme, pues se observan episodios de aumentos más pronunciados asociados a momentos de tensión económica y financiera, como alrededor de 2009, 2016–2017 y, de forma más marcada, en 2020. Después de este último episodio, el tipo de cambio se mantuvo en niveles relativamente altos. En conjunto, la gráfica sugiere que el tipo de cambio ha estado sujeto a fluctuaciones importantes en periodos de choque, pero dentro de una tendencia general de aumento en el largo plazo.
+
+```{r inflación,  include=FALSE}
+
+# Leer archivo
+inpc_raw <- read_csv(
+  "INPC 1.csv",
+  skip = 18,
+  locale = locale(encoding = "Latin1"),
+  show_col_types = FALSE
+)
+
+# Base mensual limpia
+inpc_mensual <- inpc_raw %>%
+  transmute(
+    fecha = dmy(Fecha),
+    INPC  = as.numeric(SP1)
+  ) %>%
+  arrange(fecha) %>%
+  mutate(
+    inflacion_mensual = 100 * (INPC / lag(INPC, 1) - 1),
+    inflacion_anual   = 100 * (INPC / lag(INPC, 12) - 1)
+  )
+
+# Serie trimestral
+inpc_trim <- inpc_mensual %>%
+  mutate(trimestre = as.yearqtr(fecha)) %>%
+  group_by(trimestre) %>%
+  summarise(
+    INPC = mean(INPC, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(trimestre) %>%
+  mutate(
+    inflacion_trimestral = 100 * (INPC / lag(INPC, 1) - 1),
+    inflacion_anual      = 100 * (INPC / lag(INPC, 4) - 1)
+  )
+
+```
+
+```{r tasa de interés real,  include=FALSE}
+
+# Leer archivo
+tiie_raw <- read_csv(
+  "TIIE.csv",
+  skip = 18,
+  na = c("N/E", ""),
+  locale = locale(encoding = "Latin1"),
+  show_col_types = FALSE
+)
+
+# Base mensual limpia
+tiie_mensual <- tiie_raw %>%
+  transmute(
+    fecha = dmy(Fecha),
+    tiie28 = as.numeric(SF283)
+  ) %>%
+  arrange(fecha)
+
+# Serie trimestral
+tiie_trim <- tiie_mensual %>%
+  mutate(trimestre = as.yearqtr(fecha)) %>%
+  group_by(trimestre) %>%
+  summarise(
+    tasa_nominal = if (all(is.na(tiie28))) NA_real_ else mean(tiie28, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(trimestre)
+
+# Tasa de interés real aproximada
+tasa_real_trim <- tiie_trim %>%
+  left_join(
+    inpc_trim %>% select(trimestre, inflacion_anual),
+    by = "trimestre"
+  ) %>%
+  mutate(
+    tasa_real_aprox = tasa_nominal - inflacion_anual
+  )
+
+```
+
+```{r tasa de interés real gráfica, echo=FALSE, fig.width=6.5, fig.height=4}
+
+plot_tasa_real <- tasa_real_trim %>%
+  filter(trimestre >= as.yearqtr("1994 Q1", format = "%Y Q%q")) %>%
+  mutate(fecha = as.Date(trimestre))
+
+# Gráfica de la tasa de interés real
+ggplot(plot_tasa_real, aes(x = fecha, y = tasa_real_aprox)) +
+  geom_line(linewidth = 0.8, color = "steelblue") +
+  labs(
+    title = "Gráfica 3: Tasa de interés real trimestral en México",
+    subtitle = "Tasa real aproximada = TIIE a 28 días - inflación anual trimestral",
+    x = "Trimestre",
+    y = "Porcentaje",
+    caption = "Fuente: Elaboración propia con datos de Banco de México."
+  ) +
+  scale_x_date(
+    limits = c(min(plot_tasa_real$fecha, na.rm = TRUE), as.Date("2025-12-31")),
+    breaks = as.Date(c(
+      "1995-01-01", "2000-01-01", "2005-01-01",
+      "2010-01-01", "2015-01-01", "2020-01-01", "2025-01-01"
+    )),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 0.01)
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold", size = 8),
+    panel.grid.minor = element_blank(),
+    legend.position = "none"
+  )
+
+```
+
+En lo que respecta a la tasa de interés real, la gráfica 3 muestra que la tasa de interés real trimestral en México ha presentado una evolución mucho más volátil que las variables anteriores, especialmente en 1994. Después de ese ajuste inicial, la tasa real fluctúa en niveles considerablemente menores, y en conjunto, esto sugiere que, una vez superada la inestabilidad inicial, la tasa de interés real ha tendido a estabilizarse, pero manteniendo variaciones que pueden influir sobre las decisiones de consumo.
+
+```{r tasas de cambio anual,  include=FALSE}
+
+# Consumo desestacionalizado: variación anual
+consumo_yoy <- consumo_sa %>%
+  arrange(serie, trimestre) %>%
+  group_by(serie) %>%
+  mutate(
+    cambio_anual_consumo = 100 * (valor_sa / lag(valor_sa, 4) - 1)
+  ) %>%
+  ungroup()
+
+# Base ancha para unir después
+consumo_yoy_wide <- consumo_yoy %>%
+  mutate(
+    serie_id = recode(
+      serie,
+      "Consumo agregado"  = "consumo_agregado",
+      "Consumo de bienes nacionales" = "consumo_nacional",
+      "Consumo de bienes importados" = "consumo_importado"
+    )
+  ) %>%
+  select(trimestre, serie_id, cambio_anual_consumo) %>%
+  pivot_wider(
+    names_from = serie_id,
+    values_from = cambio_anual_consumo
+  )
+
+# Tipo de cambio: variación anual
+tc_yoy <- tc_trim %>%
+  arrange(trimestre) %>%
+  mutate(
+    cambio_anual_tipo_cambio = 100 * (tipo_cambio / lag(tipo_cambio, 4) - 1)
+  )
+
+# Tasa real: cambio anual en puntos porcentuales
+tasa_real_yoy <- tasa_real_trim %>%
+  arrange(trimestre) %>%
+  mutate(
+    cambio_anual_tasa_real = tasa_real_aprox - lag(tasa_real_aprox, 4)
+  )
+
+# Base de datos final
+base_final <- consumo_yoy_wide %>%
+  left_join(
+    tc_yoy %>% select(trimestre, cambio_anual_tipo_cambio),
+    by = "trimestre"
+  ) %>%
+  left_join(
+    tasa_real_yoy %>% select(trimestre, cambio_anual_tasa_real),
+    by = "trimestre"
+  ) %>%
+  filter(trimestre >= as.yearqtr("1994 Q1", format = "%Y Q%q")) %>%
+  arrange(trimestre)
+
+# Base con nombres definidos
+indicadores_finales <- base_final %>%
+  transmute(
+    trimestre,
+    `Consumo agregado`  = consumo_agregado,
+    `Consumo de bienes nacionales` = consumo_nacional,
+    `Consumo de bienes importados` = consumo_importado,
+    `Tipo de cambio`    = cambio_anual_tipo_cambio,
+    `Tasa de interés real` = cambio_anual_tasa_real
+  )
+
+```
+
+\textbf{(c) Comparativa gráfica entre variables}
+
+\vspace{0.1cm}
+
+Con el fin de complementar el análisis descriptivo anterior, en esta sección se presentan algunas gráficas comparativas entre las variables de consumo y sus principales determinantes macroeconómicos: el tipo de cambio y la tasa de interés real. El propósito de estas gráficas es identificar, de manera preliminar, posibles patrones entre las series, así como observar si ciertos episodios de expansión, desaceleración o caída del consumo coinciden con movimientos relevantes en dichas variables macroeconómicas. En este apartado utilizaremos las variables de consumo desestacionalizadas.
+
+En particular, se comparan el tipo de cambio con los distintos componentes del consumo (consumo agregado, consumo de bienes nacionales y de bienes importados), así como la tasa de interés real con el consumo agregado, utilizando gráficas en niveles y en variación  anual. Estas comparaciones no permiten establecer por sí mismas una relación causal, pero sí constituyen una primera aproximación útil para analizar de forma gráfica la posible sensibilidad del consumo ante cambios en dichas variables.
+
+En primera instancia, realizamos la comparación entre el tipo de cambio y el consumo de bienes importados. La gráfica 4 sugiere que, en términos generales, el consumo de bienes importados y el tipo de cambio presentan una relación inversa. En particular, cuando el tipo de cambio registra aumentos importantes, el consumo de bienes importados tiende a desacelerarse o incluso a caer, como ocurre con claridad alrededor de 2009 y, sobre todo, en 2020.
+
+Esto es consistente con la intuición económica, ya que una depreciación encarece los bienes importados en moneda nacional y puede reducir su demanda. Sin embargo, la relación no parece ser total ni inmediata en todo momento, pues ambas series también muestran una tendencia creciente de largo plazo. En conjunto, la gráfica sugiere que el consumo de bienes importados es particularmente sensible a episodios de depreciación cambiaria.
+
+```{r tipo de cambio y consumo importado, echo=FALSE, fig.width=6.5, fig.height=5}
+
+# Base de consumo importado desestacionalizado
+consumo_importado_plot <- consumo_sa %>%
+  filter(serie == "Consumo de bienes importados") %>%
+  select(trimestre, consumo_importado = valor_sa)
+
+# Base de tipo de cambio
+tc_plot <- tc_trim %>%
+  select(trimestre, tipo_cambio)
+
+# Unimos ambas series
+base_doble <- consumo_importado_plot %>%
+  left_join(tc_plot, by = "trimestre") %>%
+  filter(trimestre >= as.yearqtr("1994 Q1", format = "%Y Q%q")) %>%
+  mutate(fecha = as.Date(trimestre))
+
+# Factor de escala para eje secundario
+factor_escala <- max(base_doble$consumo_importado, na.rm = TRUE) / 
+                 max(base_doble$tipo_cambio, na.rm = TRUE)
+
+# Gráfica de doble eje
+ggplot(base_doble, aes(x = fecha)) +
+  geom_line(aes(y = consumo_importado, color = "Consumo de bienes importados"), linewidth = 0.8) +
+  geom_line(aes(y = tipo_cambio * factor_escala, color = "Tipo de cambio"), linewidth = 0.8) +
+  labs(
+    title = "Gráfica 4: Tipo de cambio y consumo de bienes importados en México",
+    subtitle = "Series trimestrales en niveles",
+    x = "Trimestre",
+    y = "Monto total de bienes importados desestacionalizado",
+    caption = "Fuente: Elaboración propia con datos de INEGI y Banco de México."
+  ) +
+  scale_color_manual(
+    values = c(
+      "Consumo de bienes importados" = "firebrick",
+      "Tipo de cambio" = "steelblue"
+    )
+  ) +
+  scale_x_date(
+    limits = c(min(base_doble$fecha, na.rm = TRUE), as.Date("2025-12-31")),
+    breaks = as.Date(c(
+      "1995-01-01", "2000-01-01", "2005-01-01",
+      "2010-01-01", "2015-01-01", "2020-01-01", "2025-01-01"
+    )),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 1),
+    sec.axis = sec_axis(
+      ~ . / factor_escala,
+      name = "Pesos por dólar"
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold", size = 8),
+    panel.grid.minor = element_blank(),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  )
+
+```
+
+La gráfica 5 presenta la misma relación pero utilizando la variación anual e incorporando el consumo de bienes nacionales y el consumo agregado. Al comparar esta gráfica con la anterior, la relación entre el tipo de cambio y el consumo se aprecia con mayor claridad. 
+
+En particular, se observa que el consumo de bienes importados es el componente más volátil y el que parece reaccionar con mayor intensidad a los movimientos del tipo de cambio. Esto complementa lo observado en la gráfica en niveles, donde ya se sugería que las depreciaciones del peso tienden a asociarse con una desaceleración o contracción del consumo de bienes del exterior.
+
+Asimismo, la gráfica permite notar que el consumo agregado y el consumo de bienes nacionales presentan fluctuaciones mucho más moderadas y trayectorias bastante similares entre sí, lo que sugiere que el componente nacional domina la dinámica del consumo total.
+
+```{r grafica variacion anual tipo de cambio y consumos, echo=FALSE, fig.width=6, fig.height=4}
+
+plot_variacion_anual <- base_final %>%
+  transmute(
+    trimestre,
+    fecha = as.Date(trimestre),
+    `Tipo de cambio` = cambio_anual_tipo_cambio,
+    `Consumo agregado` = consumo_agregado,
+    `Consumo de bienes nacionales` = consumo_nacional,
+    `Consumo de bienes importados` = consumo_importado
+  ) %>%
+  pivot_longer(
+    cols = -c(trimestre, fecha),
+    names_to = "serie",
+    values_to = "valor"
+  ) %>%
+  filter(!is.na(valor))
+
+ggplot(plot_variacion_anual, aes(x = fecha, y = valor, color = serie)) +
+  geom_line(linewidth = 0.8) +
+  labs(
+    title = "Gráfica 5: Variación anual del tipo de cambio y del consumo en México",
+    subtitle = "Consumo agregado, bienes nacionales y bienes importados",
+    x = "Trimestre",
+    y = "Variación anual (%)",
+    caption = "Fuente: Elaboración propia con datos de INEGI y Banco de México."
+  ) +
+  scale_color_manual(
+    values = c(
+      "Tipo de cambio" = "steelblue",
+      "Consumo agregado" = "firebrick",
+      "Consumo de bienes nacionales" = "darkorange3",
+      "Consumo de bienes importados" = "forestgreen"
+    )
+  ) +
+  scale_x_date(
+    limits = c(min(plot_variacion_anual$fecha, na.rm = TRUE), as.Date("2025-12-31")),
+    breaks = as.Date(c(
+      "1995-01-01", "2000-01-01", "2005-01-01",
+      "2010-01-01", "2015-01-01", "2020-01-01", "2025-01-01"
+    )),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 0.1)
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold", size = 8),
+    panel.grid.minor = element_blank(),
+    legend.title = element_blank(),
+    legend.position = "bottom",
+  )
+```
+
+Posteriormente, analizamos la relación entre la tasa de interés real y el consumo agregado, con el fin de observar si los cambios en el costo real de financiamiento parecen estar asociados con la evolución del consumo. Para ello se presentan dos gráficas que comparan ambas series trimestrales en niveles y también en variación anual.
+
+```{r grafica doble eje tasa real y consumo agregado, echo=FALSE, fig.width=6, fig.height=4}
+
+# Base de consumo agregado desestacionalizado
+consumo_agregado_plot <- consumo_sa %>%
+  filter(serie == "Consumo agregado") %>%
+  select(trimestre, consumo_agregado = valor_sa)
+
+# Base de tasa de interés real
+tasa_real_plot <- tasa_real_trim %>%
+  select(trimestre, tasa_real_aprox)
+
+# Unimos ambas series
+base_doble_tasa <- consumo_agregado_plot %>%
+  left_join(tasa_real_plot, by = "trimestre") %>%
+  filter(trimestre >= as.yearqtr("1994 Q1", format = "%Y Q%q")) %>%
+  mutate(fecha = as.Date(trimestre))
+
+# Factor de escala para eje secundario
+factor_escala <- max(base_doble_tasa$consumo_agregado, na.rm = TRUE) / 
+  max(base_doble_tasa$tasa_real_aprox, na.rm = TRUE)
+
+# Gráfica de doble eje
+ggplot(base_doble_tasa, aes(x = fecha)) +
+  geom_line(aes(y = consumo_agregado, color = "Consumo agregado"), linewidth = 0.8) +
+  geom_line(aes(y = tasa_real_aprox * factor_escala, color = "Tasa de interés real"), linewidth = 0.8) +
+  labs(
+    title = "Gráfica 6: Tasa de interés real y consumo agregado en México",
+    subtitle = "Series trimestrales en niveles desestacionalizados",
+    x = "Trimestre",
+    y = "Monto total del consumo agregado desestacionalizado",
+    caption = "Fuente: Elaboración propia con datos de INEGI y Banco de México."
+  ) +
+  scale_color_manual(
+    values = c(
+      "Consumo agregado" = "firebrick",
+      "Tasa de interés real" = "steelblue"
+    )
+  ) +
+  scale_x_date(
+    limits = c(min(base_doble_tasa$fecha, na.rm = TRUE), as.Date("2025-12-31")),
+    breaks = as.Date(c(
+      "1995-01-01", "2000-01-01", "2005-01-01",
+      "2010-01-01", "2015-01-01", "2020-01-01", "2025-01-01"
+    )),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 1),
+    sec.axis = sec_axis(~ . / factor_escala, name = "Tasa de interés real (%)")
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 12, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold", size = 8),
+    panel.grid.minor = element_blank(),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  )
+```
+
+Como puede observarse en la gráfica 6, a simple vista, no se aprecia una relación inversa tan clara e inmediata como la observada entre el tipo de cambio y el consumo de bienes importados; sin embargo, sí parece que los periodos de mayor inestabilidad o aumento en la tasa real coinciden con fases de menor dinamismo del consumo. En este sentido, la gráfica sugiere que la tasa de interés real podría influir sobre la evolución del consumo agregado, aunque de una forma más difícil de identificar visualmente.
+
+La gráfica 7 en variación anual permite apreciar con mayor claridad la relación entre ambas variables, aunque esta sigue siendo menos evidente que en el caso del tipo de cambio y el consumo de bienes importados.
+
+En conjunto, las gráficas sugieren que no existe una relación visual simple e inmediata entre ambas series; sin embargo, en periodos de mayor inestabilidad macroeconómica sí parece observarse que cambios importantes en la tasa de interés real coinciden con desaceleraciones o contracciones del consumo agregado.
+
+```{r grafica doble eje variacion anual tasa real y consumo agregado, echo=FALSE, fig.width=6.5, fig.height=4}
+
+# Base para graficar
+base_doble_yoy <- base_final %>%
+  transmute(
+    trimestre,
+    fecha = as.Date(trimestre),
+    consumo_agregado = consumo_agregado,
+    cambio_anual_tasa_real = cambio_anual_tasa_real
+  ) %>%
+  filter(!is.na(consumo_agregado), !is.na(cambio_anual_tasa_real))
+
+# Factor de escala para eje secundario
+rango_consumo <- diff(range(base_doble_yoy$consumo_agregado, na.rm = TRUE))
+rango_tasa    <- diff(range(base_doble_yoy$cambio_anual_tasa_real, na.rm = TRUE))
+factor_escala <- rango_consumo / rango_tasa
+
+# Gráfica de doble eje
+ggplot(base_doble_yoy, aes(x = fecha)) +
+  geom_line(aes(y = consumo_agregado, color = "Consumo agregado"), linewidth = 0.8) +
+  geom_line(aes(y = cambio_anual_tasa_real * factor_escala, color = "Tasa de interés real"), linewidth = 0.8) +
+  labs(
+    title = "Gráfica 7: Variación anual de la tasa de interés real y del consumo agregado en México",
+    subtitle = "Series trimestrales",
+    x = "Trimestre",
+    y = "Variación anual del consumo agregado (%)",
+    caption = "Fuente: Elaboración propia con datos de INEGI y Banco de México."
+  ) +
+  scale_color_manual(
+    values = c(
+      "Consumo agregado" = "firebrick",
+      "Tasa de interés real" = "steelblue"
+    )
+  ) +
+  scale_x_date(
+    limits = c(min(base_doble_yoy$fecha, na.rm = TRUE), as.Date("2025-12-31")),
+    breaks = as.Date(c(
+      "1995-01-01", "2000-01-01", "2005-01-01",
+      "2010-01-01", "2015-01-01", "2020-01-01", "2025-01-01"
+    )),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = label_number(big.mark = ",", decimal.mark = ".", accuracy = 0.1),
+    sec.axis = sec_axis(~ . / factor_escala, name = "Cambio anual de la tasa de interés real (pp)")
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 10, color = "black"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, size = 10, color = "black", margin = margin(b = 12)
+    ),
+    plot.caption = element_text(
+      size = 8, hjust = 0.5
+    ),
+    axis.title = element_text(face = "bold", size = 8),
+    panel.grid.minor = element_blank(),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  )
+```
+
+\textbf{(d) Matriz de varianzas y covarianzas}
+
+\vspace{0.1cm}
+
+Para complementar el análisis gráfico de relación entre variables, se presenta la matriz de varianzas y covarianzas correspondiente al periodo 1995–2025. Esta matriz permite resumir, por un lado, el grado de dispersión de cada variable y, por otro, la forma en que tienden a moverse conjuntamente, ofreciendo así una primera aproximación estadística a la relación del consumo, el tipo de cambio y la tasa de interés real.
+
+```{r matriz de varianzas y covarianzas, echo=FALSE, fig.width=6.5, fig.height=4}
+
+# Creamos la base restringida al periodo 1995-2025
+datos_var_cov <- indicadores_finales %>%
+  filter(
+    trimestre >= as.yearqtr("1995 Q1", format = "%Y Q%q"),
+    trimestre <= as.yearqtr("2025 Q4", format = "%Y Q%q")
+  ) %>%
+  select(-trimestre)
+
+# Matriz de varianzas y covarianzas
+matriz_var_cov <- cov(datos_var_cov, use = "complete.obs")
+
+# Convertir a data frame
+tabla_var_cov <- as.data.frame(round(matriz_var_cov, 4)) %>%
+  tibble::rownames_to_column(var = "Variable")
+
+# Presentar tabla
+kable(
+  tabla_var_cov,
+  format = "latex",
+  booktabs = TRUE,
+  align = c("l", rep("c", ncol(tabla_var_cov) - 1)),
+  caption = "\\centering Tabla 1: Matriz de varianzas y covarianzas de las variables analizadas, 1995--2025",
+  escape = FALSE
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("hold_position", "scale_down"),
+    font_size = 9
+  ) |>
+  kableExtra::row_spec(0, bold = TRUE) |>
+  kableExtra::footnote(
+    general = "Fuente: Elaboración propia con datos de INEGI y Banco de México.",
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+```
+
+La matriz muestra, en primer lugar, que la variable con mayor varianza (y por ende mayor volatilidad) es bienes importados (159.7044), seguida por el tipo de cambio (103.7042) y la tasa de interés real (75.7284). En cambio, el consumo agregado y los bienes nacionales presentan varianzas mucho menores, de 20.0335 y 17.2306, respectivamente.
+
+En cuanto a las covarianzas, las del tipo de cambio con las variables de consumo son negativas: con consumo agregado (-20.6782), con bienes nacionales (-14.3553) y, de manera más marcada, con bienes importados (-57.6055). Esto sugiere que las depreciaciones del tipo de cambio tienden a asociarse con menores niveles o menor dinamismo del consumo, especialmente del consumo de bienes importados, lo cual es consistente con la intuición económica. Finalmente, la tasa de interés real muestra una covarianza positiva pequeña con consumo agregado (4.1541) y bienes nacionales (3.8541), pero negativa con bienes importados (-6.3467) y con el tipo de cambio (-16.0588), lo que sugiere relaciones menos claras y probablemente más débiles que las observadas para el tipo de cambio.
+
+\textbf{Tabla de correlaciones}
+
+\vspace{0.1cm}
+
+Para robustecer este análisis, fue calculada una tabla de correlaciones entre variables, con el fin de observar si las relaciones encontradas en la matriz de varianzas prevalecen.
+
+```{r tabla de correlaciones, echo=FALSE, fig.width=6.5, fig.height=4}
+
+# Base restringida al periodo 1995-2025
+datos_cor <- indicadores_finales %>%
+  filter(
+    trimestre >= as.yearqtr("1995 Q1", format = "%Y Q%q"),
+    trimestre <= as.yearqtr("2025 Q4", format = "%Y Q%q")
+  ) %>%
+  select(-trimestre)
+
+# Matriz de correlaciones
+matriz_correlaciones <- cor(datos_cor, use = "complete.obs")
+
+# Convertir a data frame
+tabla_correlaciones <- as.data.frame(round(matriz_correlaciones, 4)) %>%
+  tibble::rownames_to_column(var = "Variable")
+
+# Presentar tabla
+kable(
+  tabla_correlaciones,
+  format = "latex",
+  booktabs = TRUE,
+  align = c("l", rep("c", ncol(tabla_correlaciones) - 1)),
+  caption = "\\centering Tabla 2: Correlaciones de las variables analizadas, 1995--2025",
+  escape = FALSE
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("hold_position", "scale_down"),
+    font_size = 9
+  ) |>
+  kableExtra::row_spec(0, bold = TRUE) |>
+  kableExtra::footnote(
+    general = "Fuente: Elaboración propia con datos de INEGI y Banco de México.",
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+```
+
+Como se observa en la tabla 2, las correlaciones confirman en buena medida lo sugerido por la matriz de varianzas y covarianzas. En particular, el tipo de cambio muestra correlaciones negativas con todas las variables de consumo, mientras que la tasa de interés real presenta correlaciones muy bajas con las variables de consumo y contrarias con la intuición económica, lo que sugiere una relación más débil y menos clara que la observada para el tipo de cambio. 
+
+En específico, el sentido de estas relaciones podría justificarse porque en los datos agregados muchas cosas cambian al mismo tiempo: ingreso, expectativas, inflación, crédito, política monetaria y ciclo económico, por lo que una tasa real alta puede coincidir con periodos en los que también crece el ingreso o la actividad, y por eso el consumo no cae.
+
+Además, puede intervenir el efecto ingreso y sustitución (visto en clase), ya que para hogares ahorradores, una mayor tasa real puede elevar ingreso financiero esperado y no necesariamente reducir consumo. A nivel agregado, el resultado neto puede ser ambiguo.
+
+Por último, en un aspecto más metodológico, esta relación podría cambiar si se utilizan métodos de estimación más sofisticados, como el uso de rezagos, modelos VAR, regresiones dinámicas, entre otros.
+
+\textbf{Ejercicio con rezagos: tasa de interés real y consumo}
+
+\vspace{0.1cm}
+
+Con el fin de profundizar en el análisis de la relación entre la tasa de interés real y el consumo, en este apartado se realiza un ejercicio adicional incorporando rezagos de la tasa de interés real. La motivación de este ejercicio es que el efecto de la tasa sobre las decisiones de consumo no necesariamente se manifiesta de forma inmediata, sino que puede operar con cierto desfase. Por ello, se calculan correlaciones entre las variaciones anuales del consumo agregado, el consumo de bienes nacionales y de bienes importados, y la tasa de interés real actual y rezagada hasta cuatro trimestres, con el objetivo de explorar si la relación entre estas variables cambia.
+
+```{r correlaciones con rezagos tasa real, echo=FALSE, results='asis'}
+
+# Base de trabajo
+base_rezagos <- base_final %>%
+  filter(
+    trimestre >= as.yearqtr("1995 Q1", format = "%Y Q%q"),
+    trimestre <= as.yearqtr("2025 Q4", format = "%Y Q%q")
+  ) %>%
+  arrange(trimestre) %>%
+  mutate(
+    `Tasa de interés real actual` = cambio_anual_tasa_real,
+    `Rezago 1 de r` = lag(cambio_anual_tasa_real, 1),
+    `Rezago 2 de r` = lag(cambio_anual_tasa_real, 2),
+    `Rezago 3 de r` = lag(cambio_anual_tasa_real, 3),
+    `Rezago 4 de r` = lag(cambio_anual_tasa_real, 4)
+  )
+
+variables_consumo <- c(
+  "consumo_agregado" = "Consumo agregado",
+  "consumo_nacional" = "Consumo de bienes nacionales",
+  "consumo_importado" = "Consumo de bienes importados"
+)
+
+rezagos <- c("Tasa de interés real actual", "Rezago 1 de r", "Rezago 2 de r", "Rezago 3 de r", "Rezago 4 de r")
+
+tabla_corr_rezagos <- lapply(names(variables_consumo), function(var) {
+  vals <- sapply(rezagos, function(r) {
+    cor(base_rezagos[[var]], base_rezagos[[r]], use = "complete.obs")
+  })
+  tibble(
+    Variable = variables_consumo[[var]],
+    !!!setNames(as.list(round(vals, 4)), rezagos)
+  )
+}) %>%
+  bind_rows()
+
+kable(
+  tabla_corr_rezagos,
+  format = "latex",
+  booktabs = TRUE,
+  align = c("l", "c", "c", "c", "c", "c"),
+  caption = "\\centering Tabla 3: Correlaciones entre las variaciones anuales del consumo y la tasa de interés real con rezagos, 1995--2025",
+  escape = FALSE
+) |>
+  kableExtra::kable_styling(
+    full_width = FALSE,
+    position = "center",
+    latex_options = c("hold_position", "scale_down"),
+    font_size = 9
+  ) |>
+  kableExtra::row_spec(0, bold = TRUE) |>
+  kableExtra::footnote(
+    general = "Fuente: Elaboración propia con datos de INEGI y Banco de México. Los rezagos corresponden a la tasa de interés real rezagada entre 1 y 4 trimestres.",
+    general_title = "",
+    threeparttable = TRUE
+  )
+
+```
+
+La tabla 3 muestra que, al incorporar rezagos de la tasa de interés real, la relación con las variables de consumo se vuelve más consistente con la intuición económica. En el caso del consumo agregado y del consumo de bienes nacionales, la correlación contemporánea es ligeramente positiva, pero a partir del segundo rezago se vuelve negativa y aumenta moderadamente en magnitud. Esto sugiere que el efecto de la tasa de interés real sobre estas variables podría no ser inmediato, sino que podría manifestarse con cierto desfase.
+
+Este patrón es aún más claro en el caso de los bienes importados. Su correlación con la tasa de interés real ya es negativa en el periodo contemporáneo y se vuelve más fuerte conforme aumentan los rezagos, alcanzando su mayor magnitud en el tercer rezago. En conjunto, estos resultados sugieren que el consumo tiende a responder de manera rezagada a cambios en la tasa de interés real.
+
+
+\textbf{(e) Conclusión sobre el impacto de la tasa de interés y tipo de cambio en el consumo}
+
+\vspace{0.1cm}
+
+En conjunto, el ejercicio muestra que el consumo en México mantuvo una trayectoria creciente de largo plazo, aunque con caídas importantes en episodios de choque como 2009 y 2020. Asimismo, el componente nacional explica gran parte de la dinámica del consumo agregado, mientras que el consumo de bienes importados resulta más volátil y más sensible a movimientos del tipo de cambio. Por su parte, el tipo de cambio presenta una relación negativa más clara con las variables de consumo, especialmente con los bienes importados, mientras que la relación entre la tasa de interés real y el consumo resulta más débil y menos evidente en un análisis contemporáneo.
+
+Adicionalmente, los ejercicios de correlación y de rezagos sugieren que el efecto de la tasa de interés real sobre el consumo podría no ser inmediato, sino manifestarse con cierto desfase. En este sentido, la evidencia obtenida permite concluir que el consumo responde de manera diferenciada a sus determinantes macroeconómicos: el tipo de cambio parece incidir con mayor claridad sobre el consumo de bienes importados, mientras que la tasa de interés real muestra una relación más compleja con las variables.
