@@ -1,0 +1,478 @@
+---
+title: "Tarea 2 — Macroeconomía"
+subtitle: "Ejercicios 3 y 4"
+author: "José Miguel Hernández Aguirre"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  pdf_document:
+    toc: false
+    latex_engine: xelatex
+  html_document:
+    toc: false
+header-includes:
+  - \pagenumbering{gobble}
+  - \usepackage{caption}
+  - \captionsetup[table]{labelformat=empty}
+  - \captionsetup[figure]{labelformat=empty}
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{float}
+---
+
+\newpage
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  results = "asis",
+  fig.width = 8,
+  fig.height = 5,
+  fig.align = "center",
+  out.width = "80%"
+)
+
+res_ej3 <- file.path(getwd(), "Ejercicio 3", "Resultados Precalculados")
+res_ej4 <- file.path(getwd(), "Ejercicio 4", "Resultados Precalculados")
+
+load(file.path(res_ej3, "resultados_ej3.RData"))
+load(file.path(res_ej4, "resultados_ej4.RData"))
+
+library(knitr)
+library(kableExtra)
+```
+
+
+# Ejercicio 3: Consumo agregado en México y Estados Unidos
+
+## Introducción
+
+El presente ejercicio estudia el consumo agregado en México y en Estados Unidos, utilizando datos trimestrales de cuentas nacionales en términos reales. Para México se emplean datos del INEGI (Sistema de Cuentas Nacionales, base 2018) y el Indicador Mensual del Consumo Privado en el Mercado Interior (IMCPMI) para desagregar el consumo en bienes y servicios. Para Estados Unidos se utilizan las tablas NIPA del Bureau of Economic Analysis (BEA) en dólares encadenados de 2017.
+
+Las variables analizadas son: producto interno bruto ($Y$), consumo privado total ($C$), consumo de servicios ($C_s$), consumo de bienes ($C_b$), inversión ($I$), gasto de gobierno ($G$) y exportaciones netas ($NX = X - M$).
+
+El objetivo es contrastar la Hipótesis de Ingreso Permanente (HIP) de Friedman utilizando tanto las propiedades cíclicas de las series agregadas como regresiones directas. Para ello se construyen versiones filtradas de las series (tasas de crecimiento, HP, Band-Pass y Beveridge-Nelson), se analiza la relación entre consumo y producto, y se estiman modelos que permiten evaluar si el consumo responde al ingreso corriente o al permanente.
+
+## Inciso (a): Datos
+
+Para México, el periodo común de todas las variables (incluyendo $C_s$ y $C_b$) abarca `r nrow(panel_mex)` observaciones trimestrales (de `r format(min(panel_mex$fecha), "%Y")` a `r format(max(panel_mex$fecha), "%Y")`). Si bien la tarea solicita datos desde 1980, el periodo queda acotado por dos razones: las series de oferta y demanda global del INEGI (C, I, G, X, M a precios constantes de 2018) inician en 1993, y el desglose del consumo en bienes y servicios depende del IMCPMI, cuyo índice en niveles llega hasta 2017. El PIB sí está disponible desde 1980, pero el panel se restringe al periodo común para mantener la comparabilidad entre todas las variables. El desglose $C_s$/$C_b$ se construyó distribuyendo el consumo privado total según las proporciones del índice IMCPMI (base 2008), agregado de frecuencia mensual a trimestral.
+
+Para Estados Unidos, el desglose bienes/servicios en la Table 1.1.6 del BEA cubre `r nrow(panel_usa)` observaciones (desde `r format(min(panel_usa$fecha), "%Y")`). Las series anteriores a 2007 registran ``---'' en las columnas de Goods y Services, por lo que el panel queda restringido a ese periodo.
+
+## Inciso (b): Series de tiempo
+
+### Niveles
+
+```{r b-niveles-mex, fig.cap="Series en niveles — México (millones de pesos a precios de 2018)."}
+knitr::include_graphics(file.path(res_ej3, "b_niveles_mex.png"))
+```
+
+En México se observa una tendencia creciente en todas las variables, con el PIB y el consumo privado como las series dominantes en magnitud. La inversión ($I$) y el gasto de gobierno ($G$) se mantienen en niveles considerablemente menores. Se distinguen claramente los episodios de la crisis de 1995 (efecto tequila) y la desaceleración de 2008-2009 como caídas abruptas en todas las series.
+
+```{r b-niveles-usa, fig.cap="Series en niveles — Estados Unidos (miles de millones de dólares encadenados 2017)."}
+knitr::include_graphics(file.path(res_ej3, "b_niveles_usa.png"))
+```
+
+En Estados Unidos, el periodo cubierto (2007-2025) captura la Gran Recesión de 2008-2009 y la caída por COVID-19 en 2020. El consumo de servicios ($C_s$) supera ampliamente al de bienes ($C_b$), reflejando la estructura de una economía avanzada orientada al sector terciario. La inversión es el componente más volátil, con caídas pronunciadas en ambas recesiones.
+
+### Logaritmo natural
+
+```{r b-log-mex, fig.cap="Series en logaritmo natural — México."}
+knitr::include_graphics(file.path(res_ej3, "b_log_mex.png"))
+```
+
+La transformación logarítmica permite comparar las tasas de crecimiento de las series independientemente de su escala. En México, la pendiente del logaritmo del PIB es relativamente estable, sugiriendo un crecimiento tendencial moderado. El consumo de servicios ($C_s$) muestra una pendiente más pronunciada que el de bienes ($C_b$), indicando un proceso gradual de terciarización del consumo.
+
+```{r b-log-usa, fig.cap="Series en logaritmo natural — Estados Unidos."}
+knitr::include_graphics(file.path(res_ej3, "b_log_usa.png"))
+```
+
+En EE.UU. las series en logaritmo revelan que el consumo de servicios creció más rápidamente que el de bienes hasta 2020, cuando la pandemia invirtió temporalmente la relación: el consumo de bienes se disparó mientras los servicios colapsaron. La recuperación posterior restauró la tendencia previa.
+
+### Exportaciones netas
+
+```{r b-nx-mex, fig.cap="Exportaciones netas — México."}
+knitr::include_graphics(file.path(res_ej3, "b_NX_mex.png"))
+```
+
+Las exportaciones netas de México son persistentemente negativas durante la mayor parte del periodo, reflejando el déficit comercial estructural de la economía mexicana. Se observa una mejora gradual a partir de 2010, consistente con el crecimiento del sector manufacturero exportador y la integración a cadenas de valor norteamericanas.
+
+```{r b-nx-usa, fig.cap="Exportaciones netas — Estados Unidos."}
+knitr::include_graphics(file.path(res_ej3, "b_NX_usa.png"))
+```
+
+Estados Unidos presenta un déficit comercial persistente que se profundizó hasta la crisis de 2008, se redujo temporalmente durante la recesión (caída de importaciones), y volvió a ampliarse con la recuperación. El deterioro reciente (post-2020) refleja el fuerte estímulo fiscal que impulsó la demanda de importaciones.
+
+
+## Inciso (c): Versiones filtradas
+
+### Tasas de crecimiento interanual
+
+La tasa de crecimiento se define como $\Delta\%a_t = (a_t - a_{t-4})/a_{t-4}$, es decir, el cambio respecto al mismo trimestre del año anterior. Si bien la fórmula del enunciado escribe $a_{t-1}$, la aclaración parentética ``cambios vs el año anterior'' indica que se trata del cambio interanual, es decir, respecto al mismo trimestre del año previo ($t-4$ en datos trimestrales). Esta es la interpretación estándar en el análisis de cuentas nacionales trimestrales, ya que elimina la estacionalidad de las series.
+
+```{r c-tc-mex, fig.cap="Tasas de crecimiento interanual — México."}
+knitr::include_graphics(file.path(res_ej3, "c_tasas_crec_mex.png"))
+```
+
+En México, las tasas de crecimiento revelan que el consumo de servicios ($C_s$) es la serie más volátil, con oscilaciones de hasta $\pm 50\%$. Esto se debe en parte a la metodología de construcción (proporciones IMCPMI aplicadas al consumo total). La inversión también muestra alta volatilidad, como es típico en los ciclos económicos. Los comovimientos entre consumo y producto son claramente visibles: las recesiones de 1995 y 2009 aparecen como caídas sincronizadas de todas las variables.
+
+```{r c-tc-usa, fig.cap="Tasas de crecimiento interanual — Estados Unidos."}
+knitr::include_graphics(file.path(res_ej3, "c_tasas_crec_usa.png"))
+```
+
+En EE.UU., la Gran Recesión de 2009 y el colapso por COVID-19 en 2020 dominan el panorama. La inversión registra las mayores caídas (superiores a $-20\%$). Llama la atención el rebote de 2021, donde todas las variables registran crecimientos interanuales excepcionalmente altos, un artefacto del efecto base generado por la caída de 2020.
+
+#### Matriz de varianzas y covarianzas — Tasas de crecimiento
+
+```{r vcov-tc-mex}
+kable(round(vcov_tc_mex * 10000, 2), booktabs = TRUE,
+      format = "latex",
+      caption = "Var-Cov de tasas de crecimiento — México ($\\times 10^4$).") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+En la diagonal se leen las varianzas: $C_s$ (245.95) es con mucho la serie más volátil, seguida de $I$ (119.82). Las covarianzas positivas entre $Y$, $C$ e $I$ confirman su carácter procíclico. Nótese la covarianza negativa de $C_b$ con el resto de variables. Este es un artefacto de la metodología de construcción del desglose (distribución por proporciones del IMCPMI) y constituye una **limitación del dato**, no un hallazgo económico sustantivo. En EE.UU., donde bienes y servicios se miden directamente, ambos son procíclicos.
+
+```{r vcov-tc-usa}
+kable(round(vcov_tc_usa * 10000, 2), booktabs = TRUE,
+      format = "latex",
+      caption = "Var-Cov de tasas de crecimiento — EE.UU. ($\\times 10^4$).") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+En EE.UU., la inversión ($I$) es la variable más volátil (76.52), seguida del consumo de bienes (13.89). Todas las variables tienen covarianzas positivas entre sí, excepto el gasto de gobierno ($G$), que presenta covarianzas negativas, reflejando su carácter contracíclico (política fiscal estabilizadora).
+
+
+### Filtro Hodrick-Prescott ($\lambda = 1600$)
+
+El filtro HP descompone cada serie en tendencia y ciclo, utilizando $\lambda = 1600$ como es estándar para datos trimestrales.
+
+```{r c-hp-mex, fig.cap="Componente cíclico HP — México."}
+knitr::include_graphics(file.path(res_ej3, "c_hp_mex.png"))
+```
+
+El componente cíclico HP de México muestra los episodios recesivos de 1995 y 2009 como desviaciones negativas pronunciadas (del orden de $-20\%$ a $-40\%$ respecto a la tendencia). Los ciclos del consumo y el PIB están fuertemente correlacionados. La inversión amplifica los movimientos del ciclo, como predice la teoría del acelerador.
+
+```{r c-hp-usa, fig.cap="Componente cíclico HP — Estados Unidos."}
+knitr::include_graphics(file.path(res_ej3, "c_hp_usa.png"))
+```
+
+En EE.UU., la Gran Recesión aparece como una desviación negativa de alrededor de $-10\%$ en la inversión y $-5\%$ en el PIB. El shock de COVID-19 (2020) genera una caída aún más abrupta pero de recuperación más rápida. Los componentes cíclicos del consumo de bienes y servicios se mueven en la misma dirección que el PIB, aunque con amplitudes diferentes.
+
+```{r vcov-hp-mex}
+kable(round(vcov_hp_mex * 10000, 2), booktabs = TRUE,
+      format = "latex",
+      caption = "Var-Cov del componente cíclico HP — México ($\\times 10^4$).") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+```{r vcov-hp-usa}
+kable(round(vcov_hp_usa * 10000, 2), booktabs = TRUE,
+      format = "latex",
+      caption = "Var-Cov del componente cíclico HP — EE.UU. ($\\times 10^4$).") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+Comparando ambas matrices, la varianza del componente cíclico del PIB en México (7.19) es casi cuatro veces mayor que en EE.UU. (1.89), confirmando que la economía mexicana experimenta fluctuaciones cíclicas más pronunciadas.
+
+
+### Filtro Band-Pass (Baxter-King, 6–32 trimestres)
+
+El filtro Band-Pass aísla las fluctuaciones con periodicidad entre 6 y 32 trimestres (1.5 a 8 años), correspondientes a los ciclos económicos según la definición de Burns y Mitchell.
+
+```{r c-bp-mex, fig.cap="Componente cíclico Band-Pass — México."}
+knitr::include_graphics(file.path(res_ej3, "c_bp_mex.png"))
+```
+
+El filtro BP produce un componente cíclico más suave que el HP, al eliminar tanto las frecuencias muy altas (ruido) como las muy bajas (tendencia). En México se identifican claramente los ciclos asociados a la crisis del tequila (1995), la desaceleración de 2001-2003 y la Gran Recesión de 2009.
+
+```{r c-bp-usa, fig.cap="Componente cíclico Band-Pass — Estados Unidos."}
+knitr::include_graphics(file.path(res_ej3, "c_bp_usa.png"))
+```
+
+En EE.UU., el filtro BP revela un ciclo pronunciado asociado a la Gran Recesión, con la inversión liderando tanto la caída como la recuperación. La muestra es relativamente corta para este filtro (76 observaciones menos 24 en los extremos), lo que limita la identificación de ciclos completos.
+
+```{r vcov-bp-mex}
+if (!is.null(vcov_bp_mex)) {
+  kable(round(vcov_bp_mex * 10000, 2), booktabs = TRUE, format = "latex",
+        caption = "Var-Cov del componente cíclico BP — México ($\\times 10^4$).") %>%
+    kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+}
+```
+
+```{r vcov-bp-usa}
+if (!is.null(vcov_bp_usa)) {
+  kable(round(vcov_bp_usa * 10000, 2), booktabs = TRUE, format = "latex",
+        caption = "Var-Cov del componente cíclico BP — EE.UU. ($\\times 10^4$).") %>%
+    kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+}
+```
+
+Las varianzas del filtro BP son menores que las del HP, lo cual es esperado al eliminar fluctuaciones de alta frecuencia. La estructura de covarianzas se mantiene: inversión y consumo son procíclicos, gasto de gobierno es contracíclico en EE.UU.
+
+
+### Filtro Beveridge-Nelson
+
+El filtro BN define la tendencia como el pronóstico de largo plazo de la serie, estimado mediante un modelo AR sobre la primera diferencia del logaritmo. El ciclo es la desviación respecto a ese pronóstico.
+
+```{r c-bn-mex, fig.cap="Componente cíclico Beveridge-Nelson — México."}
+knitr::include_graphics(file.path(res_ej3, "c_bn_mex.png"))
+```
+
+El filtro BN asigna más variación al componente cíclico que el HP o el BP, produciendo desviaciones de mayor amplitud. En México, el componente cíclico muestra una deriva descendente hasta mediados de los 2000, seguida de una recuperación. Esto sugiere que la tendencia estimada por BN crece más rápido que la serie observada durante los primeros años, y más lento después.
+
+```{r c-bn-usa, fig.cap="Componente cíclico Beveridge-Nelson — Estados Unidos."}
+knitr::include_graphics(file.path(res_ej3, "c_bn_usa.png"))
+```
+
+En EE.UU., el filtro BN produce un componente cíclico que parece capturar también cambios estructurales de mediano plazo, no solo ciclos de negocios. Las desviaciones son del orden de $-40\%$ en algunos casos, mucho mayores que con los otros filtros.
+
+```{r vcov-bn-mex}
+if (!is.null(vcov_bn_mex)) {
+  kable(round(vcov_bn_mex * 10000, 2), booktabs = TRUE, format = "latex",
+        caption = "Var-Cov del componente cíclico BN — México ($\\times 10^4$).") %>%
+    kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+}
+```
+
+```{r vcov-bn-usa}
+if (!is.null(vcov_bn_usa)) {
+  kable(round(vcov_bn_usa * 10000, 2), booktabs = TRUE, format = "latex",
+        caption = "Var-Cov del componente cíclico BN — EE.UU. ($\\times 10^4$).") %>%
+    kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+}
+```
+
+### Comparación de filtros
+
+Los tres filtros capturan patrones cíclicos similares pero con diferencias importantes en amplitud y suavidad. El filtro HP es el más utilizado en la práctica y produce ciclos de amplitud moderada. El Band-Pass es más restrictivo al aislar solo frecuencias de ciclo de negocios, generando un componente más limpio pero perdiendo observaciones en los extremos. El filtro Beveridge-Nelson produce el componente cíclico más volátil, ya que descansa en un modelo paramétrico (AR) cuyas propiedades dependen de la especificación elegida.
+
+Para el análisis de la HIP, los tres filtros coinciden en el resultado cualitativo: el consumo se mueve con el ciclo del producto, lo cual es difícil de reconciliar con un suavizamiento perfecto del consumo.
+
+
+## Inciso (d): Relación consumo–producto
+
+Se grafican las tasas de crecimiento interanual del consumo ($\Delta\%C_t$) contra las del PIB ($\Delta\%Y_t$) para cada tipo de consumo. Bajo la HIP estricta, no debería existir una relación contemporánea significativa.
+
+### México
+
+```{r d-scatter-C-mex, out.width="65%", fig.cap="$\\Delta\\%Y$ vs $\\Delta\\%C$ — México."}
+knitr::include_graphics(file.path(res_ej3, "d_scatter_C_mex.png"))
+```
+
+La relación entre el crecimiento del PIB y del consumo total es fuertemente positiva y casi lineal. La pendiente cercana a 1 indica que el consumo se mueve casi uno a uno con el producto, sugiriendo que los hogares mexicanos no logran suavizar su consumo frente a fluctuaciones del ingreso agregado.
+
+```{r d-scatter-Cs-mex, out.width="65%", fig.cap="$\\Delta\\%Y$ vs $\\Delta\\%C_s$ — México."}
+knitr::include_graphics(file.path(res_ej3, "d_scatter_Cs_mex.png"))
+```
+
+El consumo de servicios muestra una relación positiva con el PIB pero con mayor dispersión, resultado de la alta volatilidad de $C_s$ (amplificada por la construcción basada en el IMCPMI). La pendiente es mayor que 1, indicando que los servicios amplifican las fluctuaciones del producto.
+
+```{r d-scatter-Cb-mex, out.width="65%", fig.cap="$\\Delta\\%Y$ vs $\\Delta\\%C_b$ — México."}
+knitr::include_graphics(file.path(res_ej3, "d_scatter_Cb_mex.png"))
+```
+
+El consumo de bienes presenta una relación negativa con el PIB. Es importante señalar que este resultado es una **limitación del dato**, no un hallazgo económico sustantivo: al distribuir $C$ entre $C_s$ y $C_b$ usando proporciones del IMCPMI, si $C_s$ sobrereacciona al ciclo (como se observa), $C_b$ compensa mecánicamente en la dirección opuesta. En EE.UU., donde las series se miden directamente, tanto bienes como servicios son procíclicos.
+
+### Estados Unidos
+
+```{r d-scatter-C-usa, out.width="65%", fig.cap="$\\Delta\\%Y$ vs $\\Delta\\%C$ — EE.UU."}
+knitr::include_graphics(file.path(res_ej3, "d_scatter_C_usa.png"))
+```
+
+En EE.UU. la relación consumo total–producto es igualmente fuerte. La pendiente ligeramente superior a 1 indica que el consumo crece algo más que proporcionalmente al PIB en las expansiones y cae más en las recesiones.
+
+```{r d-scatter-Cs-usa, out.width="65%", fig.cap="$\\Delta\\%Y$ vs $\\Delta\\%C_s$ — EE.UU."}
+knitr::include_graphics(file.path(res_ej3, "d_scatter_Cs_usa.png"))
+```
+
+El consumo de servicios en EE.UU. muestra una relación positiva clara con el PIB. La dispersión es menor que en México, reflejando datos de mayor calidad y una medición directa (no construida por proporciones).
+
+```{r d-scatter-Cb-usa, out.width="65%", fig.cap="$\\Delta\\%Y$ vs $\\Delta\\%C_b$ — EE.UU."}
+knitr::include_graphics(file.path(res_ej3, "d_scatter_Cb_usa.png"))
+```
+
+El consumo de bienes en EE.UU. también es procíclico, con mayor dispersión que los servicios. Esto es consistente con la teoría: los bienes (especialmente durables) son más sensibles al ciclo porque su compra es postergable.
+
+
+## Inciso (e): Volatilidad
+
+```{r volatilidad}
+kable(volatilidad, booktabs = TRUE, format = "latex", col.names = c("Variable", "México (pp)", "EE.UU. (pp)"),
+      caption = "Desviación estándar de las tasas de crecimiento interanual (puntos porcentuales).") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"))
+```
+
+En ambos países el consumo agregado es más volátil que el PIB: en México, $\sigma_C = 3.76$ pp vs $\sigma_Y = 3.58$ pp; en EE.UU., $\sigma_C = 2.75$ pp vs $\sigma_Y = 2.36$ pp. Esto contradice la predicción de la HIP de que el consumo debería ser más suave que el ingreso.
+
+En EE.UU. el patrón es el esperado: bienes ($\sigma_{C_b} = 3.73$ pp) más volátiles que servicios ($\sigma_{C_s} = 3.11$ pp). En México, $C_s$ registra una volatilidad extraordinariamente alta (15.68 pp), lo cual es un artefacto de la metodología de construcción más que un reflejo del comportamiento real del consumo de servicios.
+
+La mayor volatilidad general de México respecto a EE.UU. es consistente con la mayor exposición de la economía mexicana a shocks externos y con mercados financieros menos profundos que dificultan el suavizamiento del consumo.
+
+## Inciso (f): Regresiones — HIP
+
+Para cada tipo de consumo se estiman cuatro modelos:
+
+1. $C_t = a + bY_t + \epsilon_t$ (en niveles)
+2. $\Delta\%C_t = a + b\Delta\%Y_t + \epsilon_t$ (tasas de crecimiento)
+3. $\Delta\%C_t = a + b\Delta\%Y_{t-1} + \epsilon_t$ (ingreso rezagado)
+4. $c_t = a + by_t + \epsilon_t$ (en logaritmos, donde minúsculas denotan $\ln$)
+
+### México
+
+```{r reg-mex-C}
+kable(extraer_resumen_reg(reg_mex, "C"), booktabs = TRUE,
+      format = "latex",
+      caption = "Regresiones HIP — Consumo total, México.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+```{r reg-mex-Cs}
+kable(extraer_resumen_reg(reg_mex, "Cs"), booktabs = TRUE,
+      format = "latex",
+      caption = "Regresiones HIP — Consumo de servicios, México.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+```{r reg-mex-Cb}
+kable(extraer_resumen_reg(reg_mex, "Cb"), booktabs = TRUE,
+      format = "latex",
+      caption = "Regresiones HIP — Consumo de bienes, México.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+Para el consumo total en México, el modelo en niveles muestra una relación lineal positiva y altamente significativa entre $C$ e $Y$. La elasticidad de largo plazo en logaritmos ($b = 1.19$) es significativamente mayor que 1, sugiriendo que el consumo crece más que proporcionalmente al ingreso. En tasas de crecimiento, $b = 0.94$ con $R^2 = 0.81$, lo que indica una fuerte respuesta contemporánea del consumo al ingreso corriente. El modelo con ingreso rezagado también es significativo ($b = 0.78$, $t = 10.80$), violando la implicación de caminata aleatoria de Hall.
+
+### Estados Unidos
+
+```{r reg-usa-C}
+kable(extraer_resumen_reg(reg_usa, "C"), booktabs = TRUE,
+      format = "latex",
+      caption = "Regresiones HIP — Consumo total, EE.UU.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+```{r reg-usa-Cs}
+kable(extraer_resumen_reg(reg_usa, "Cs"), booktabs = TRUE,
+      format = "latex",
+      caption = "Regresiones HIP — Consumo de servicios, EE.UU.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+```{r reg-usa-Cb}
+kable(extraer_resumen_reg(reg_usa, "Cb"), booktabs = TRUE,
+      format = "latex",
+      caption = "Regresiones HIP — Consumo de bienes, EE.UU.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+En EE.UU., el consumo total tiene una elasticidad de largo plazo casi unitaria ($b = 1.07$) y una respuesta contemporánea de $b = 1.10$ en tasas de crecimiento. El modelo con ingreso rezagado es significativo para consumo total ($b = 0.61$, $t = 5.09$) y servicios ($t = 5.93$), pero no para bienes ($t = 1.40$, no significativo). Esto sugiere que el consumo de bienes en EE.UU. es menos predecible a partir del ingreso pasado, lo cual es parcialmente consistente con la HIP para esta categoría.
+
+## Inciso (g): Conclusiones sobre la HIP
+
+La Hipótesis de Ingreso Permanente (HIP) de Friedman predice que el consumo responde al ingreso permanente y no al ingreso corriente. En su versión más estricta (Hall, 1978), el consumo sigue un camino aleatorio y no debería ser predecible a partir de variables rezagadas.
+
+**Modelo en logaritmos ($c_t = a + by_t$):** La elasticidad del consumo respecto al ingreso es cercana a 1 en ambos países, consistente con una relación de largo plazo entre consumo e ingreso. Esto no distingue entre la HIP y un modelo keynesiano simple.
+
+**Modelo en niveles ($C_t = a + bY_t$):** La relación es significativa en todos los casos, pero tanto la HIP como un modelo keynesiano predicen que consumo e ingreso se mueven juntos. La PMgC estimada (coeficiente $b$) es menor que 1, lo cual es consistente con ahorro positivo.
+
+**Modelo en tasas de crecimiento ($\Delta\%C_t = a + b\Delta\%Y_t$):** El coeficiente $b$ significativamente distinto de cero indica que el consumo responde al ingreso corriente, lo cual contradice la versión estricta de la HIP. Si los agentes suavizaran perfectamente su consumo, las variaciones del ingreso corriente no deberían afectar al consumo.
+
+**Modelo con ingreso rezagado ($\Delta\%C_t = a + b\Delta\%Y_{t-1}$):** El coeficiente $b$ es significativo en la mayoría de los casos, violando directamente la implicación de caminata aleatoria de Hall: información pasada no debería predecir el crecimiento del consumo actual.
+
+En conjunto, la evidencia para México sugiere un exceso de sensibilidad del consumo al ingreso corriente, inconsistente con la HIP en su forma estricta. Esto es esperable en una economía donde una proporción importante de los hogares enfrenta restricciones de liquidez y no puede suavizar su consumo intertemporalmente. Para Estados Unidos, el resultado es cualitativamente similar aunque con una excepción parcial: el consumo de bienes no es significativamente predecible a partir del ingreso rezagado, lo cual podría reflejar un mayor grado de suavizamiento en esta categoría, facilitado por mercados de crédito más profundos.
+
+\newpage
+
+# Ejercicio 4: Consumo de los individuos en México (ENIGH 2020)
+
+## Inciso (a): Datos
+
+Se utilizan los microdatos del concentrado de hogares de la Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH) 2020, publicada por el INEGI. La variable de ingreso es el ingreso corriente trimestral (\texttt{ing\_cor}) y la de gasto es el gasto monetario trimestral (\texttt{gasto\_mon}). El factor de expansión (\texttt{factor}) permite extrapolar los resultados de la muestra a la población total de hogares mexicanos. Cabe señalar que la ENIGH 2020 se levantó en el contexto de la pandemia de COVID-19, lo que pudo afectar tanto los patrones de ingreso como de gasto de los hogares.
+
+## Inciso (b): Estadísticas descriptivas
+
+```{r tabla-desc-ej4}
+kable(tabla_descriptiva, booktabs = TRUE, format = "latex",
+      col.names = c("Concepto", "Muestra", "Expandido (población)"),
+      caption = "Estadísticas descriptivas — ENIGH 2020.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"))
+```
+
+La muestra contiene `r format(n_hogares_muestra, big.mark = ",")` hogares entrevistados, que representan aproximadamente `r format(round(n_hogares_expansion, 0), big.mark = ",")` hogares a nivel nacional. El ingreso corriente promedio expandido es de \$`r format(round(ing_prom_expansion, 0), big.mark = ",")` pesos trimestrales y el gasto monetario promedio es de \$`r format(round(gas_prom_expansion, 0), big.mark = ",")` pesos trimestrales. El hecho de que el gasto promedio sea menor que el ingreso implica una tasa de ahorro positiva a nivel agregado, consistente con la predicción de la HIP de que los hogares no gastan todo su ingreso corriente.
+
+## Inciso (c): Relación ingreso-gasto — Todas las familias
+
+Se estima el modelo $G_i = a + b Y_i + \epsilon_i$, donde $G_i$ es el gasto monetario y $Y_i$ el ingreso corriente del hogar $i$.
+
+```{r scatter-todas, out.width="75%", fig.cap="Relación ingreso-gasto: todas las familias."}
+knitr::include_graphics(file.path(res_ej4, "c_scatter_todas.png"))
+```
+
+```{r reg-todas}
+kable(tabla_regresiones[1, ], booktabs = TRUE, format = "latex", row.names = FALSE,
+      col.names = c("Submuestra", "n", "a", "b (PMgC)", "t(a)", "t(b)", "R²"),
+      caption = "Regresión ingreso-gasto: todas las familias.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+El coeficiente $b = `r round(tabla_regresiones$b[1], 4)`$ representa la propensión marginal a consumir (PMgC): por cada peso adicional de ingreso corriente, el hogar promedio destina aproximadamente `r round(tabla_regresiones$b[1], 2)` pesos a gasto monetario. El intercepto positivo ($a = `r format(round(tabla_regresiones$a[1], 0), big.mark = ",")`$) indica que existe un nivel de gasto autónomo (independiente del ingreso), lo cual es consistente con la función consumo keynesiana. El $R^2$ relativamente bajo (0.23) indica que el ingreso corriente explica solo una fracción de la variación del gasto, lo cual es esperado en datos de corte transversal donde la heterogeneidad entre hogares es alta.
+
+## Inciso (d): Jefas de familia mujeres, 20–30 años, CDMX
+
+Se restringe la muestra a hogares con jefe de familia femenino (\texttt{sexo\_jefe} = 2), con edad entre 20 y 30 años, ubicados en la Ciudad de México (entidad 09).
+
+```{r scatter-mujeres, out.width="75%", fig.cap="Relación ingreso-gasto: jefas mujeres 20-30 años, CDMX."}
+f_d <- file.path(res_ej4, "d_scatter_mujeres_cdmx.png")
+if (file.exists(f_d)) knitr::include_graphics(f_d)
+```
+
+```{r reg-mujeres}
+kable(tabla_regresiones[2, ], booktabs = TRUE, format = "latex", row.names = FALSE,
+      col.names = c("Submuestra", "n", "a", "b (PMgC)", "t(a)", "t(b)", "R²"),
+      caption = "Regresión ingreso-gasto: jefas mujeres 20-30, CDMX.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+Esta submuestra es considerablemente más pequeña (`r nrow(sub_d)` hogares), lo que reduce la precisión de las estimaciones. La PMgC de este grupo ($b = 0.69$) es sustancialmente mayor que la de la población general ($0.17$). Esto sugiere que estos hogares destinan una proporción mucho mayor de cada peso adicional al gasto, consistente con mayores restricciones de liquidez en hogares jóvenes con jefatura femenina. El intercepto no significativo ($t = -0.22$) indica que, a diferencia de la muestra general, no hay evidencia de un gasto autónomo significativo en este grupo: el gasto depende casi enteramente del ingreso. El $R^2$ de 0.68 es notablemente más alto, indicando que el ingreso corriente explica una proporción mucho mayor de la variación del gasto en esta subpoblación.
+
+## Inciso (e): Hogares del ámbito urbano
+
+Se define ámbito urbano como localidades de 2,500 o más habitantes (\texttt{tam\_loc} $\leq$ 3).
+
+```{r scatter-urbano, out.width="75%", fig.cap="Relación ingreso-gasto: hogares urbanos."}
+knitr::include_graphics(file.path(res_ej4, "e_scatter_urbano.png"))
+```
+
+```{r reg-urbano}
+kable(tabla_regresiones[3, ], booktabs = TRUE, format = "latex", row.names = FALSE,
+      col.names = c("Submuestra", "n", "a", "b (PMgC)", "t(a)", "t(b)", "R²"),
+      caption = "Regresión ingreso-gasto: hogares urbanos.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+Los hogares urbanos presentan una PMgC de 0.25, superior a la de la muestra completa (0.17). Esto podría reflejar mayores costos de vida en áreas urbanas que obligan a destinar una mayor proporción del ingreso al gasto, o bien una composición diferente del ingreso (más salarios, menos transferencias).
+
+### Comparación de submuestras
+
+```{r tabla-comp}
+kable(tabla_regresiones, booktabs = TRUE, format = "latex", row.names = FALSE,
+      col.names = c("Submuestra", "n", "a", "b (PMgC)", "t(a)", "t(b)", "R²"),
+      caption = "Comparación de regresiones ingreso-gasto por submuestra.") %>%
+  kable_styling(full_width = FALSE, position = "center", latex_options = c("HOLD_position", "scale_down"), font_size = 9)
+```
+
+La comparación revela un gradiente claro: la PMgC aumenta conforme la subpoblación enfrenta mayores restricciones. Las jefas jóvenes en CDMX (0.69) gastan mucho más de cada peso adicional que el hogar promedio (0.17), mientras que los hogares urbanos (0.25) se ubican en un punto intermedio. Este patrón es consistente con la existencia de restricciones de liquidez heterogéneas: los hogares más restringidos financieramente se comportan más como consumidores keynesianos (PMgC alta), mientras que los menos restringidos logran suavizar más su consumo.
+
+## Inciso (f): Interpretación a la luz de la HIP
+
+La HIP predice que el consumo responde al ingreso permanente y no al corriente. En un corte transversal como la ENIGH, si la HIP se cumple, las diferencias de ingreso corriente entre hogares incluyen tanto diferencias en ingreso permanente como shocks transitorios. El consumo solo respondería a la parte permanente, por lo que la PMgC estimada debería ser menor que 1.
+
+La PMgC estimada para la muestra completa es de `r round(tabla_regresiones$b[1], 4)`, significativamente menor que 1. Esto es consistente con la HIP: no todo el ingreso corriente se traduce en gasto, lo cual sugiere que parte de la variación del ingreso es transitoria y los hogares la ahorran.
+
+Las diferencias en la PMgC entre submuestras reflejan heterogeneidad en las restricciones de liquidez y en la composición del ingreso. Los hogares con jefe de familia joven y femenino en la CDMX presentan una PMgC mucho mayor (0.69), lo cual indica que estos hogares enfrentan mayores restricciones de acceso al crédito y gastan una proporción mayor de cada peso adicional. Los hogares urbanos (PMgC = 0.25) se ubican entre la muestra general y la submuestra de jefas jóvenes.
+
+**Comparación con datos agregados (Ejercicio 3):** A nivel agregado, la evidencia apunta a un exceso de sensibilidad del consumo al ingreso corriente, violando la HIP estricta. Los datos microeconómicos complementan este resultado de dos maneras. Primero, la PMgC menor que 1 en el corte transversal es consistente con la HIP: los hogares no gastan todo su ingreso corriente. Segundo, la heterogeneidad entre submuestras confirma que las restricciones de liquidez son un determinante clave de la desviación respecto a la HIP: los hogares más restringidos financieramente presentan una PMgC más alta, comportándose más como consumidores keynesianos que como optimizadores intertemporales.
+
+En síntesis, la evidencia tanto agregada como microeconómica sugiere que la HIP captura una dimensión importante del comportamiento del consumo (la PMgC menor que 1), pero es insuficiente para explicar la fuerte sensibilidad del consumo al ingreso corriente, especialmente en hogares con restricciones de liquidez.
