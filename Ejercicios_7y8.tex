@@ -1,0 +1,1571 @@
+\documentclass{article}\usepackage[]{graphicx}\usepackage[]{xcolor}
+% maxwidth is the original width if it is less than linewidth
+% otherwise use linewidth (to make sure the graphics do not exceed the margin)
+\makeatletter
+\def\maxwidth{ %
+  \ifdim\Gin@nat@width>\linewidth
+    \linewidth
+  \else
+    \Gin@nat@width
+  \fi
+}
+\makeatother
+
+\definecolor{fgcolor}{rgb}{0.345, 0.345, 0.345}
+\newcommand{\hlnum}[1]{\textcolor[rgb]{0.686,0.059,0.569}{#1}}%
+\newcommand{\hlsng}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
+\newcommand{\hlcom}[1]{\textcolor[rgb]{0.678,0.584,0.686}{\textit{#1}}}%
+\newcommand{\hlopt}[1]{\textcolor[rgb]{0,0,0}{#1}}%
+\newcommand{\hldef}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
+\newcommand{\hlkwa}[1]{\textcolor[rgb]{0.161,0.373,0.58}{\textbf{#1}}}%
+\newcommand{\hlkwb}[1]{\textcolor[rgb]{0.69,0.353,0.396}{#1}}%
+\newcommand{\hlkwc}[1]{\textcolor[rgb]{0.333,0.667,0.333}{#1}}%
+\newcommand{\hlkwd}[1]{\textcolor[rgb]{0.737,0.353,0.396}{\textbf{#1}}}%
+\let\hlipl\hlkwb
+
+\usepackage{framed}
+\makeatletter
+\newenvironment{kframe}{%
+ \def\at@end@of@kframe{}%
+ \ifinner\ifhmode%
+  \def\at@end@of@kframe{\end{minipage}}%
+  \begin{minipage}{\columnwidth}%
+ \fi\fi%
+ \def\FrameCommand##1{\hskip\@totalleftmargin \hskip-\fboxsep
+ \colorbox{shadecolor}{##1}\hskip-\fboxsep
+     % There is no \\@totalrightmargin, so:
+     \hskip-\linewidth \hskip-\@totalleftmargin \hskip\columnwidth}%
+ \MakeFramed {\advance\hsize-\width
+   \@totalleftmargin\z@ \linewidth\hsize
+   \@setminipage}}%
+ {\par\unskip\endMakeFramed%
+ \at@end@of@kframe}
+\makeatother
+
+\definecolor{shadecolor}{rgb}{.97, .97, .97}
+\definecolor{messagecolor}{rgb}{0, 0, 0}
+\definecolor{warningcolor}{rgb}{1, 0, 1}
+\definecolor{errorcolor}{rgb}{1, 0, 0}
+\newenvironment{knitrout}{}{} % an empty environment to be redefined in TeX
+
+\usepackage{alltt}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+
+\setlength{\parskip}{0.8em}
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\begin{document}
+
+\newpage
+{\large\bfseries Ejercicio 7. Estudie el ''acertijo del premio al riesgo'' para el caso de México y de EE. UU.}
+\vspace{0.2cm}
+
+En esta parte se recopilarán series anuales del IPC, del NASDAQ y del índice accionario correspondiente al país asignado, así como la tasa de interés promedio anual a un año para cada economía considerada. Con esta información se calculará, primero, la tasa de retorno nominal anual de los índices bursátiles y, después, la diferencia entre dicho retorno y el rendimiento de invertir a la tasa libre de riesgo de corto plazo. El objetivo de esta sección es construir la variable central del análisis: el exceso de retorno del mercado accionario.
+
+Una vez obtenidos los excesos de retorno, se estimará su covarianza con la tasa de crecimiento real del consumo agregado, del consumo de bienes durables y del consumo de servicios en cada economía. Para el caso de México, también se incorporará el consumo agregado de bienes importados. A partir de estas covarianzas se calculará el parámetro de aversión relativa al riesgo bajo el supuesto de una función de utilidad ARRC. Finalmente, se interpretarán los resultados para evaluar si las fluctuaciones del consumo observadas permiten explicar de manera razonable el premio al riesgo de las acciones.
+\vspace{0.3cm}
+
+\textbf{(a) Valores anuales del IPC y de índices bursátiles seleccionados}
+
+
+
+
+
+\begin{center}
+Tabla. México: Índice Nacional de Precios al Consumidor (promedio anual)
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & INPC & Año & INPC\\
+\midrule
+1990 & 8.6284 & 2008 & 66.9309\\
+1991 & 10.5838 & 2009 & 70.4765\\
+1992 & 12.2251 & 2010 & 73.4060\\
+1993 & 13.4172 & 2011 & 75.9072\\
+1994 & 14.3518 & 2012 & 79.0281\\
+\addlinespace
+1995 & 19.3749 & 2013 & 82.0362\\
+1996 & 26.0356 & 2014 & 85.3330\\
+1997 & 31.4056 & 2015 & 87.6546\\
+1998 & 36.4080 & 2016 & 90.1279\\
+1999 & 42.4465 & 2017 & 95.5730\\
+\addlinespace
+2000 & 46.4754 & 2018 & 100.2554\\
+2001 & 49.4348 & 2019 & 103.9007\\
+2002 & 51.9217 & 2020 & 107.4300\\
+2003 & 54.2826 & 2021 & 113.5419\\
+2004 & 56.8276 & 2022 & 122.5075\\
+\addlinespace
+2005 & 59.0939 & 2023 & 129.2797\\
+2006 & 61.2387 & 2024 & 135.3846\\
+2007 & 63.6679 & 2025 & 140.5422\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Banco de México.}
+\end{center}
+
+
+Para México se utiliza el Índice Nacional de Precios al Consumidor (INPC) general, obtenido de Banco de México. Dado que la serie original se encuentra en frecuencia mensual, para este inciso se construyó una serie anual a partir del promedio de los doce meses de cada año. En la tabla se reportan únicamente años completos.
+
+
+
+\begin{center}
+Tabla. Estados Unidos: Consumer Price Index for All Urban Consumers, promedio anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & CPI & Año & CPI\\
+\midrule
+1990 & 130.6583 & 2008 & 215.2543\\
+1991 & 136.1667 & 2009 & 214.5647\\
+1992 & 140.3083 & 2010 & 218.0762\\
+1993 & 144.4750 & 2011 & 224.9230\\
+1994 & 148.2250 & 2012 & 229.5861\\
+\addlinespace
+1995 & 152.3833 & 2013 & 232.9518\\
+1996 & 156.8583 & 2014 & 236.7150\\
+1997 & 160.5250 & 2015 & 237.0018\\
+1998 & 163.0083 & 2016 & 240.0054\\
+1999 & 166.5833 & 2017 & 245.1210\\
+\addlinespace
+2000 & 172.1917 & 2018 & 251.0995\\
+2001 & 177.0417 & 2019 & 255.6526\\
+2002 & 179.8667 & 2020 & 258.8558\\
+2003 & 184.0000 & 2021 & 270.9734\\
+2004 & 188.9083 & 2022 & 292.6264\\
+\addlinespace
+2005 & 195.2667 & 2023 & 304.7030\\
+2006 & 201.5583 & 2024 & 313.6982\\
+2007 & 207.3442 & 2025 & 321.9619\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de la Federal Reserve Economic Data (FRED), Federal Reserve Bank of St. Louis.}
+\end{center}
+
+
+Para Estados Unidos se utiliza la serie \textit{Consumer Price Index for All Urban Consumers: All Items in U.S. City Average} (CPIAUCSL), obtenida de FRED. Dado que la serie original se encuentra en frecuencia mensual, se construyó una serie anual usando el promedio de los doce meses de cada año. En la tabla se reportan únicamente años completos.
+
+
+
+\begin{center}
+Tabla. España: Índice general de precios al consumidor, promedio anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & IPC & Año & IPC\\
+\midrule
+2002 & 16.5049 & 2014 & 19.5641\\
+2003 & 16.5694 & 2015 & 19.5316\\
+2004 & 17.1519 & 2016 & 19.5500\\
+2005 & 17.8241 & 2017 & 20.5599\\
+2006 & 18.3657 & 2018 & 20.9669\\
+\addlinespace
+2007 & 18.7159 & 2019 & 20.7304\\
+2008 & 19.6719 & 2020 & 20.1120\\
+2009 & 18.0777 & 2021 & 22.6371\\
+2010 & 19.2154 & 2022 & 26.1627\\
+2011 & 20.1989 & 2023 & 25.1731\\
+\addlinespace
+2012 & 20.5121 & 2024 & 25.5491\\
+2013 & 20.1149 & 2025 & 26.1354\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Instituto Nacional de Estadística (INE) de España.}
+\end{center}
+
+
+Para España se utiliza la serie del índice general de precios al consumidor obtenida del Instituto Nacional de Estadística (INE). Dado que la información original se encuentra en frecuencia mensual, se construyó una serie anual usando el promedio de los doce meses de cada año. En la tabla se reportan únicamente años completos.
+
+
+
+\begin{center}
+Tabla. México: Índice de Precios y Cotizaciones de la Bolsa Mexicana de Valores, cierre anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & IPC BMV & Año & IPC BMV\\
+\midrule
+1990 & 628.7900 & 2008 & 22,380.3200\\
+1991 & 1,431.4600 & 2009 & 32,120.4700\\
+1992 & 1,759.4400 & 2010 & 38,550.7900\\
+1993 & 2,602.6300 & 2011 & 37,077.5200\\
+1994 & 2,375.6600 & 2012 & 43,705.8300\\
+\addlinespace
+1995 & 2,778.4700 & 2013 & 42,727.0900\\
+1996 & 3,361.0300 & 2014 & 43,145.6600\\
+1997 & 5,229.3500 & 2015 & 42,977.5000\\
+1998 & 3,959.6600 & 2016 & 45,642.9000\\
+1999 & 7,129.8800 & 2017 & 49,354.4200\\
+\addlinespace
+2000 & 5,652.1900 & 2018 & 41,640.2700\\
+2001 & 6,372.2800 & 2019 & 43,541.0200\\
+2002 & 6,127.0900 & 2020 & 44,066.8800\\
+2003 & 8,795.2800 & 2021 & 53,272.4400\\
+2004 & 12,917.8800 & 2022 & 48,463.8600\\
+\addlinespace
+2005 & 17,802.7100 & 2023 & 57,386.2500\\
+2006 & 26,448.3200 & 2024 & 49,513.2700\\
+2007 & 29,536.8300 & 2025 & 64,308.2900\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Banco de México (Banxico).}
+\end{center}
+
+
+Para México se utiliza el Índice de Precios y Cotizaciones de la Bolsa Mexicana de Valores, obtenido de Banco de México. Dado que la serie original se encuentra en frecuencia diaria, se construyó una serie anual utilizando el último valor disponible de cada año, es decir, el cierre anual del índice. En la tabla se reportan únicamente años completos.
+
+
+
+\begin{center}
+Tabla. Estados Unidos: NASDAQ Composite, cierre anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & NASDAQ & Año & NASDAQ\\
+\midrule
+1990 & 373.8400 & 2008 & 1,577.0300\\
+1991 & 586.3400 & 2009 & 2,269.1500\\
+1992 & 676.9500 & 2010 & 2,652.8700\\
+1993 & 776.8000 & 2011 & 2,605.1500\\
+1994 & 751.9600 & 2012 & 3,019.5100\\
+\addlinespace
+1995 & 1,052.1300 & 2013 & 4,176.5900\\
+1996 & 1,291.0300 & 2014 & 4,736.0500\\
+1997 & 1,570.3500 & 2015 & 5,007.4100\\
+1998 & 2,192.6900 & 2016 & 5,383.1200\\
+1999 & 4,069.3100 & 2017 & 6,903.3900\\
+\addlinespace
+2000 & 2,470.5200 & 2018 & 6,635.2800\\
+2001 & 1,950.4000 & 2019 & 8,972.6000\\
+2002 & 1,335.5100 & 2020 & 12,888.2800\\
+2003 & 1,996.6200 & 2021 & 15,644.9700\\
+2004 & 2,175.4400 & 2022 & 10,466.4800\\
+\addlinespace
+2005 & 2,205.3200 & 2023 & 15,011.3500\\
+2006 & 2,415.2900 & 2024 & 19,310.7900\\
+2007 & 2,652.2800 & 2025 & 23,241.9900\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de la Federal Reserve Economic Data (FRED), Federal Reserve Bank of St. Louis.}
+\end{center}
+
+
+Para Estados Unidos se utiliza el índice NASDAQ Composite, obtenido de FRED. Dado que la serie original se encuentra en frecuencia diaria, se construyó una serie anual utilizando el último valor disponible de cada año, es decir, el cierre anual del índice. En la tabla se reportan únicamente años completos.
+
+
+
+\begin{center}
+Tabla. España: IBEX 35, cierre anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & IBEX 35 & Año & IBEX 35\\
+\midrule
+1993 & 3,615.2000 & 2010 & 9,859.1000\\
+1994 & 3,087.7000 & 2011 & 8,566.3000\\
+1995 & 3,630.8000 & 2012 & 8,167.5000\\
+1996 & 5,154.8000 & 2013 & 9,916.7000\\
+1997 & 7,255.4000 & 2014 & 10,279.5000\\
+\addlinespace
+1998 & 9,836.6000 & 2015 & 9,544.2000\\
+1999 & 11,641.4000 & 2016 & 9,352.1000\\
+2000 & 9,109.8000 & 2017 & 10,043.9000\\
+2001 & 8,397.6000 & 2018 & 8,539.9000\\
+2002 & 6,036.9000 & 2019 & 9,549.2000\\
+\addlinespace
+2003 & 7,737.2000 & 2020 & 8,073.7000\\
+2004 & 9,080.8000 & 2021 & 8,713.8000\\
+2005 & 10,733.9000 & 2022 & 8,229.1000\\
+2006 & 14,146.5000 & 2023 & 10,102.1000\\
+2007 & 15,182.3000 & 2024 & 11,595.0000\\
+\addlinespace
+2008 & 9,195.8000 & 2025 & 17,307.8000\\
+2009 & 11,940.0000 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de Yahoo Finance.}
+\end{center}
+
+
+Para España se utiliza el índice IBEX 35, obtenido de Yahoo Finance. Dado que la serie original se encuentra en frecuencia mensual, se construyó una serie anual usando el último valor disponible de cada año, equivalente al cierre anual del índice. En la tabla se reportan únicamente años completos.
+
+\newpage
+\textbf{(b) Tasa de retorno nominal anual}
+
+La tasa de retorno nominal anual de cada índice accionario se calcula como la variación porcentual entre el valor de cierre de un año y el valor de cierre del año inmediato anterior. En términos generales, para cualquier índice \(P_t\), el retorno nominal anual se obtiene con:
+\[
+R_t=\left(\frac{P_t-P_{t-1}}{P_{t-1}}\right)\times 100
+\]
+donde \(P_t\) representa el valor del índice al cierre del año \(t\), y \(P_{t-1}\) el valor del cierre del año previo. Dado que se trabaja con cierres anuales, el primer año disponible no tiene tasa de retorno, ya que no existe un año anterior dentro de la muestra para calcular la variación.
+
+
+
+\begin{center}
+Tabla. México: tasa de retorno nominal anual del IPC de la Bolsa Mexicana de Valores
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Retorno \textbackslash{}\% & Año & Retorno \textbackslash{}\%\\
+\midrule
+1991 & 127.6531 & 2009 & 43.521\\
+1992 & 22.9123 & 2010 & 20.0194\\
+1993 & 47.9238 & 2011 & -3.8216\\
+1994 & -8.7208 & 2012 & 17.8769\\
+1995 & 16.9557 & 2013 & -2.2394\\
+\addlinespace
+1996 & 20.9669 & 2014 & 0.9796\\
+1997 & 55.5877 & 2015 & -0.3897\\
+1998 & -24.2801 & 2016 & 6.2018\\
+1999 & 80.0629 & 2017 & 8.1316\\
+2000 & -20.7253 & 2018 & -15.6301\\
+\addlinespace
+2001 & 12.7400 & 2019 & 4.5647\\
+2002 & -3.8478 & 2020 & 1.2077\\
+2003 & 43.5474 & 2021 & 20.89\\
+2004 & 46.8729 & 2022 & -9.0264\\
+2005 & 37.8145 & 2023 & 18.4104\\
+\addlinespace
+2006 & 48.5634 & 2024 & -13.7193\\
+2007 & 11.6775 & 2025 & 29.8809\\
+2008 & -24.2291 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de la Bolsa Mexicana de Valores (BMV).}
+\end{center}
+
+
+Para México, la tasa de retorno nominal anual se obtuvo a partir del cierre anual del Índice de Precios y Cotizaciones de la Bolsa Mexicana de Valores. Los resultados muestran la variación porcentual anual del índice respecto al cierre del año inmediato anterior.
+
+\begin{center}
+Tabla. Estados Unidos: tasa de retorno nominal anual del NASDAQ Composite
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Retorno \textbackslash{}\% & Año & Retorno \textbackslash{}\%\\
+\midrule
+1991 & 56.8425 & 2009 & 43.8876\\
+1992 & 15.4535 & 2010 & 16.9103\\
+1993 & 14.7500 & 2011 & -1.7988\\
+1994 & -3.1977 & 2012 & 15.9054\\
+1995 & 39.9183 & 2013 & 38.3201\\
+\addlinespace
+1996 & 22.7063 & 2014 & 13.3951\\
+1997 & 21.6354 & 2015 & 5.7297\\
+1998 & 39.6307 & 2016 & 7.5031\\
+1999 & 85.5853 & 2017 & 28.2414\\
+2000 & -39.2890 & 2018 & -3.8837\\
+\addlinespace
+2001 & -21.0531 & 2019 & 35.2256\\
+2002 & -31.5264 & 2020 & 43.6404\\
+2003 & 49.5024 & 2021 & 21.3891\\
+2004 & 8.9561 & 2022 & -33.1\\
+2005 & 1.3735 & 2023 & 43.4231\\
+\addlinespace
+2006 & 9.5211 & 2024 & 28.6413\\
+2007 & 9.8121 & 2025 & 20.3575\\
+2008 & -40.5406 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de la Federal Reserve Economic Data (FRED), Federal Reserve Bank of St. Louis.}
+\end{center}
+
+
+Para Estados Unidos, la tasa de retorno nominal anual se calculó usando el cierre anual del NASDAQ Composite. La serie permite observar los años de expansión y contracción del mercado accionario estadounidense dentro del periodo analizado.
+
+\begin{center}
+Tabla. España: tasa de retorno nominal anual del IBEX 35
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Retorno \textbackslash{}\% & Año & Retorno \textbackslash{}\%\\
+\midrule
+1994 & -14.5912 & 2010 & -17.4280\\
+1995 & 17.5891 & 2011 & -13.1128\\
+1996 & 41.9742 & 2012 & -4.6555\\
+1997 & 40.7504 & 2013 & 21.4166\\
+1998 & 35.5763 & 2014 & 3.6585\\
+\addlinespace
+1999 & 18.3478 & 2015 & -7.1531\\
+2000 & -21.7465 & 2016 & -2.0127\\
+2001 & -7.8180 & 2017 & 7.3973\\
+2002 & -28.1116 & 2018 & -14.9743\\
+2003 & 28.1651 & 2019 & 11.8186\\
+\addlinespace
+2004 & 17.3655 & 2020 & -15.4516\\
+2005 & 18.2043 & 2021 & 7.9282\\
+2006 & 31.7927 & 2022 & -5.5624\\
+2007 & 7.3220 & 2023 & 22.7607\\
+2008 & -39.4308 & 2024 & 14.7781\\
+\addlinespace
+2009 & 29.8419 & 2025 & 49.2695\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de Yahoo Finance.}
+\end{center}
+
+
+Para España, la tasa de retorno nominal anual se calculó a partir del cierre anual del IBEX 35. Al igual que en los otros casos, el cálculo refleja la variación porcentual anual del índice respecto al año previo.
+
+\newpage
+\textbf{(c) Tasa de interés anual promedio a un año para los tres países}
+
+
+
+\begin{center}
+Tabla. México: CETES a 364 días, promedio anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Tasa \textbackslash{}\% & Año & Tasa \textbackslash{}\%\\
+\midrule
+1990 & 24.9500 & 2009 & 5.7669\\
+1991 & 19.7680 & 2010 & 4.8508\\
+1992 & 16.8113 & 2011 & 4.6585\\
+1993 & 15.4400 & 2012 & 4.6185\\
+1994 & 13.7346 & 2013 & 3.9792\\
+\addlinespace
+1995 & 37.5862 & 2014 & 3.37\\
+1996 & 34.2225 & 2015 & 3.5331\\
+1997 & 22.3487 & 2016 & 4.5715\\
+1998 & 22.3221 & 2017 & 7.0962\\
+1999 & 24.2250 & 2018 & 8.0646\\
+\addlinespace
+2000 & 16.9385 & 2019 & 7.89\\
+2001 & 13.5800 & 2020 & 4.7879\\
+2002 & 8.6154 & 2021 & 5.2544\\
+2003 & 7.2477 & 2022 & 9.085\\
+2004 & 7.7954 & 2023 & 11.4942\\
+\addlinespace
+2005 & 9.2392 & 2024 & 10.9135\\
+2006 & 7.4931 & 2025 & 8.3312\\
+2007 & 7.5877 & 2026 & 7.3867\\
+2008 & 8.1192 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Banco de México (Banxico).}
+\end{center}
+
+
+Para México se utiliza la tasa de CETES a 364 días, obtenida de Banco de México. Dado que la serie original se encuentra en frecuencia diaria, se construyó una serie anual a partir del promedio de las observaciones disponibles dentro de cada año. Esta variable aproxima el rendimiento anual de un instrumento gubernamental de corto plazo.
+
+
+
+\begin{center}
+Tabla. Estados Unidos: rendimiento del Treasury a 1 año, promedio anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Tasa \textbackslash{}\% & Año & Tasa \textbackslash{}\%\\
+\midrule
+1990 & 7.8872 & 2009 & 0.4735\\
+1991 & 5.8609 & 2010 & 0.3176\\
+1992 & 3.8891 & 2011 & 0.1809\\
+1993 & 3.4344 & 2012 & 0.1748\\
+1994 & 5.3175 & 2013 & 0.1312\\
+\addlinespace
+1995 & 5.9421 & 2014 & 0.1211\\
+1996 & 5.5159 & 2015 & 0.3227\\
+1997 & 5.6315 & 2016 & 0.6143\\
+1998 & 5.0525 & 2017 & 1.2029\\
+1999 & 5.0831 & 2018 & 2.3308\\
+\addlinespace
+2000 & 6.1129 & 2019 & 2.052\\
+2001 & 3.4900 & 2020 & 0.3701\\
+2002 & 2.0019 & 2021 & 0.104\\
+2003 & 1.2414 & 2022 & 2.7965\\
+2004 & 1.8877 & 2023 & 5.0817\\
+\addlinespace
+2005 & 3.6210 & 2024 & 4.6872\\
+2006 & 4.9362 & 2025 & 3.9133\\
+2007 & 4.5312 & 2026 & 3.5198\\
+2008 & 1.8268 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de la Federal Reserve Economic Data (FRED), Federal Reserve Bank of St. Louis.}
+\end{center}
+
+
+Para Estados Unidos se utiliza la serie \textit{Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity}, obtenida de FRED. Dado que la serie original se encuentra en frecuencia diaria, se construyó una serie anual a partir del promedio de las observaciones disponibles dentro de cada año. Esta variable representa el rendimiento promedio anual de los bonos del Tesoro estadounidense a un año.
+
+
+
+\begin{center}
+Tabla. España: Letras del Tesoro a 1 año, promedio anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Tasa \textbackslash{}\% & Año & Tasa \textbackslash{}\%\\
+\midrule
+1987 & 14.2369 & 2007 & 4.0904\\
+1988 & 10.8023 & 2008 & 3.7427\\
+1989 & 13.6868 & 2009 & 1.0195\\
+1990 & 14.2355 & 2010 & 1.7442\\
+1991 & 12.4784 & 2011 & 3.2338\\
+\addlinespace
+1992 & 12.4982 & 2012 & 2.8369\\
+1993 & 10.5694 & 2013 & 1.2206\\
+1994 & 8.1148 & 2014 & 0.4212\\
+1995 & 9.8715 & 2015 & 0.0717\\
+1996 & 7.2424 & 2016 & -0.1429\\
+\addlinespace
+1997 & 5.0024 & 2017 & -0.3418\\
+1998 & 3.7918 & 2018 & -0.3686\\
+1999 & 3.0020 & 2019 & -0.4067\\
+2000 & 4.6218 & 2020 & -0.3978\\
+2001 & 3.8984 & 2021 & -0.5544\\
+\addlinespace
+2002 & 3.3579 & 2022 & 0.7304\\
+2003 & 2.1888 & 2023 & 3.3968\\
+2004 & 2.1344 & 2024 & 3.0878\\
+2005 & 2.1904 & 2025 & 2.0291\\
+2006 & 3.2515 & 2026 & 2.0300\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Banco de España.}
+\end{center}
+
+
+Para España se utiliza la serie de Letras del Tesoro a 1 año, obtenida del Banco de España. Dado que la serie original se encuentra en frecuencia mensual, se construyó una serie anual a partir del promedio de las observaciones disponibles dentro de cada año. Esta variable aproxima el rendimiento anual promedio de un instrumento de deuda pública de corto plazo emitido por el gobierno español.
+
+\newpage
+\textbf{(d) Exceso de retorno del mercado accionario respecto a la tasa a un año}
+
+Para cada país, esta diferencia se calcula como el exceso de retorno del mercado accionario respecto a la tasa de interés a un año. En términos generales, la variable se define como:
+
+\[
+ER_t = R^{m}_t - i_t
+\]
+
+donde \(R^{m}_t\) es el retorno nominal anual del índice accionario en el año \(t\), e \(i_t\) es la tasa de interés promedio anual a un año correspondiente al mismo año. Esta diferencia aproxima el premio por invertir en acciones en lugar de mantener un instrumento de renta fija de corto plazo.
+
+
+
+\begin{center}
+Tabla. México: exceso de retorno anual del mercado accionario respecto a CETES a 364 días
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Exceso \textbackslash{}\% & Año & Exceso \textbackslash{}\%\\
+\midrule
+1991 & 107.8851 & 2009 & 37.7541\\
+1992 & 6.1010 & 2010 & 15.1686\\
+1993 & 32.4838 & 2011 & -8.4801\\
+1994 & -22.4554 & 2012 & 13.2584\\
+1995 & -20.6305 & 2013 & -6.2186\\
+\addlinespace
+1996 & -13.2556 & 2014 & -2.3904\\
+1997 & 33.2390 & 2015 & -3.9228\\
+1998 & -46.6021 & 2016 & 1.6303\\
+1999 & 55.8379 & 2017 & 1.0355\\
+2000 & -37.6638 & 2018 & -23.6947\\
+\addlinespace
+2001 & -0.8400 & 2019 & -3.3253\\
+2002 & -12.4631 & 2020 & -3.5802\\
+2003 & 36.2997 & 2021 & 15.6356\\
+2004 & 39.0775 & 2022 & -18.1114\\
+2005 & 28.5753 & 2023 & 6.9162\\
+\addlinespace
+2006 & 41.0704 & 2024 & -24.6327\\
+2007 & 4.0898 & 2025 & 21.5498\\
+2008 & -32.3483 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para México, el exceso de retorno se obtiene restando al retorno nominal anual del Índice de Precios y Cotizaciones de la Bolsa Mexicana de Valores la tasa promedio anual de CETES a 364 días. Esta variable resume cuánto mayor o menor fue el rendimiento accionario respecto a una inversión en deuda pública de corto plazo.
+
+\begin{center}
+Tabla. Estados Unidos: exceso de retorno anual del NASDAQ respecto al Treasury a 1 año
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Exceso \textbackslash{}\% & Año & Exceso \textbackslash{}\%\\
+\midrule
+1991 & 50.9816 & 2009 & 43.414\\
+1992 & 11.5644 & 2010 & 16.5926\\
+1993 & 11.3155 & 2011 & -1.9797\\
+1994 & -8.5152 & 2012 & 15.7306\\
+1995 & 33.9762 & 2013 & 38.189\\
+\addlinespace
+1996 & 17.1904 & 2014 & 13.274\\
+1997 & 16.0039 & 2015 & 5.407\\
+1998 & 34.5781 & 2016 & 6.8888\\
+1999 & 80.5022 & 2017 & 27.0385\\
+2000 & -45.4019 & 2018 & -6.2146\\
+\addlinespace
+2001 & -24.5431 & 2019 & 33.1736\\
+2002 & -33.5282 & 2020 & 43.2703\\
+2003 & 48.2610 & 2021 & 21.2851\\
+2004 & 7.0685 & 2022 & -35.8965\\
+2005 & -2.2474 & 2023 & 38.3414\\
+\addlinespace
+2006 & 4.5848 & 2024 & 23.9541\\
+2007 & 5.2808 & 2025 & 16.4442\\
+2008 & -42.3674 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para Estados Unidos, el exceso de retorno se calcula como la diferencia entre el retorno nominal anual del NASDAQ Composite y el rendimiento promedio anual del Treasury a 1 año. Esta variable indica el rendimiento adicional del mercado accionario frente a un activo gubernamental de corto plazo.
+
+\begin{center}
+Tabla. España: exceso de retorno anual del IBEX 35 respecto a las Letras del Tesoro a 1 año
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Exceso \textbackslash{}\% & Año & Exceso \textbackslash{}\%\\
+\midrule
+1994 & -22.7059 & 2010 & -19.1721\\
+1995 & 7.7176 & 2011 & -16.3466\\
+1996 & 34.7318 & 2012 & -7.4924\\
+1997 & 35.7480 & 2013 & 20.1960\\
+1998 & 31.7844 & 2014 & 3.2372\\
+\addlinespace
+1999 & 15.3458 & 2015 & -7.2247\\
+2000 & -26.3684 & 2016 & -1.8698\\
+2001 & -11.7164 & 2017 & 7.7391\\
+2002 & -31.4695 & 2018 & -14.6057\\
+2003 & 25.9763 & 2019 & 12.2253\\
+\addlinespace
+2004 & 15.2310 & 2020 & -15.0538\\
+2005 & 16.0139 & 2021 & 8.4826\\
+2006 & 28.5412 & 2022 & -6.2929\\
+2007 & 3.2315 & 2023 & 19.3639\\
+2008 & -43.1735 & 2024 & 11.6903\\
+\addlinespace
+2009 & 28.8224 & 2025 & 47.2404\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para España, el exceso de retorno se obtiene al restar del retorno nominal anual del IBEX 35 la tasa promedio anual de las Letras del Tesoro a 1 año. Esta diferencia representa el premio anual por mantener acciones en lugar de invertir en deuda pública de corto plazo.
+
+\newpage
+\textbf{(e) Covarianza entre el exceso de retorno y el crecimiento real del consumo agregado}
+
+
+
+\begin{center}
+Tabla. México: índice de consumo privado, nivel anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Índice & Año & Índice\\
+\midrule
+1993 & 53.7009 & 2009 & 79.0926\\
+1994 & 56.4447 & 2010 & 82.818\\
+1995 & 53.0237 & 2011 & 86.6634\\
+1996 & 54.9289 & 2012 & 88.5195\\
+1997 & 59.1464 & 2013 & 90.8053\\
+\addlinespace
+1998 & 63.1886 & 2014 & 92.6244\\
+1999 & 65.8821 & 2015 & 95.1006\\
+2000 & 71.6339 & 2016 & 96.902\\
+2001 & 73.6439 & 2017 & 98.5848\\
+2002 & 74.8205 & 2018 & 100\\
+\addlinespace
+2003 & 76.4000 & 2019 & 100.9188\\
+2004 & 78.1708 & 2020 & 91.0051\\
+2005 & 79.8120 & 2021 & 98.629\\
+2006 & 83.3713 & 2022 & 103.3314\\
+2007 & 84.3015 & 2025 & 111.6705\\
+\addlinespace
+2008 & 85.1691 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Instituto Nacional de Estadística y Geografía (INEGI).}
+\end{center}
+
+
+Para México se utiliza la serie del índice de consumo privado, obtenida de INEGI. Dado que la información original se encuentra en frecuencia mensual, se construyó una serie anual a partir del promedio de las observaciones disponibles dentro de cada año. Esta base aproxima la evolución real del consumo agregado de los hogares.
+
+
+
+\begin{center}
+Tabla. Estados Unidos: consumo personal real, nivel anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Consumo & Año & Consumo\\
+\midrule
+1980 & 4,497.2040 & 2003 & 9,937.5680\\
+1981 & 4,559.5620 & 2004 & 10,312.2140\\
+1982 & 4,626.3060 & 2005 & 10,677.4100\\
+1983 & 4,888.2050 & 2006 & 10,986.7730\\
+1984 & 5,145.3620 & 2007 & 11,253.8520\\
+\addlinespace
+1985 & 5,411.7630 & 2008 & 11,270.7360\\
+1986 & 5,635.1670 & 2009 & 11,123.5970\\
+1987 & 5,826.0770 & 2010 & 11,335.6030\\
+1988 & 6,069.4260 & 2011 & 11,528.4840\\
+1989 & 6,246.3860 & 2012 & 11,686.1180\\
+\addlinespace
+1990 & 6,372.1930 & 2013 & 11,889.9250\\
+1991 & 6,383.6960 & 2014 & 12,226.4460\\
+1992 & 6,618.6200 & 2015 & 12,638.7890\\
+1993 & 6,849.1900 & 2016 & 12,949.0120\\
+1994 & 7,114.5490 & 2017 & 13,290.6260\\
+\addlinespace
+1995 & 7,324.4650 & 2018 & 13,654.9250\\
+1996 & 7,578.6180 & 2019 & 13,948.1330\\
+1997 & 7,863.9910 & 2020 & 13,596.8600\\
+1998 & 8,281.6530 & 2021 & 14,792.4340\\
+1999 & 8,727.2970 & 2022 & 15,236.8210\\
+\addlinespace
+2000 & 9,166.8790 & 2023 & 15,627.7740\\
+2001 & 9,393.8860 & 2024 & 16,088.5000\\
+2002 & 9,632.7670 & 2025 & 16,511.0960\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de la Federal Reserve Economic Data (FRED), Federal Reserve Bank of St. Louis.}
+\end{center}
+
+
+Para Estados Unidos se utiliza la serie \textit{Real Personal Consumption Expenditures}, obtenida de FRED. Esta base representa el nivel anual del consumo agregado real y servirá posteriormente para calcular su tasa de crecimiento anual.
+
+
+
+\begin{center}
+Tabla. España: consumo privado real, nivel anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Consumo & Año & Consumo\\
+\midrule
+1981 & 328,830.7464 & 2001 & 560,339.9459\\
+1982 & 329,462.0506 & 2002 & 577,502.4519\\
+1983 & 330,809.9662 & 2003 & 591,752.4950\\
+1984 & 332,148.4562 & 2004 & 616,352.1400\\
+1985 & 339,036.4804 & 2005 & 642,797.3966\\
+\addlinespace
+1986 & 351,050.4068 & 2006 & 669,757.7496\\
+1987 & 371,946.8329 & 2007 & 693,024.2281\\
+1988 & 390,875.2562 & 2008 & 686,146.1948\\
+1989 & 411,434.8065 & 2009 & 656,807.8304\\
+1990 & 425,744.3490 & 2010 & 659,042.8731\\
+\addlinespace
+1991 & 437,551.0929 & 2011 & 641,732.9680\\
+1992 & 446,758.2003 & 2012 & 619,764.3514\\
+1993 & 436,633.3172 & 2013 & 601,973.3741\\
+1994 & 442,938.0267 & 2014 & 612,188.1757\\
+1995 & 448,249.5295 & 2015 & 630,215.0000\\
+\addlinespace
+1996 & 459,127.5956 & 2016 & 647,190.0000\\
+1997 & 472,106.5684 & 2017 & 666,835.4084\\
+1998 & 492,644.9167 & 2018 & 678,677.1077\\
+1999 & 516,259.0910 & 2019 & 684,940.8142\\
+2000 & 539,418.7435 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Banco de España.}
+\end{center}
+
+
+Para España se utiliza la serie anual de gasto en consumo final de los hogares y de las ISFLSH a precios constantes de 2015, obtenida del Banco de España. Dado que la información original ya se encuentra en frecuencia anual y en términos reales, no fue necesario deflactar ni agregar observaciones dentro del año. Esta base representa el nivel anual del consumo agregado real y servirá posteriormente para calcular su tasa de crecimiento anual.
+
+
+
+\begin{center}
+Tabla. México: tasa de crecimiento real anual del consumo agregado
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Crecimiento \textbackslash{}\% & Año & Crecimiento \textbackslash{}\%\\
+\midrule
+1994 & 5.1095 & 2009 & -7.1346\\
+1995 & -6.0609 & 2010 & 4.7101\\
+1996 & 3.5932 & 2011 & 4.6432\\
+1997 & 7.6780 & 2012 & 2.1417\\
+1998 & 6.8343 & 2013 & 2.5823\\
+\addlinespace
+1999 & 4.2627 & 2014 & 2.0033\\
+2000 & 8.7304 & 2015 & 2.6734\\
+2001 & 2.8059 & 2016 & 1.8942\\
+2002 & 1.5977 & 2017 & 1.7366\\
+2003 & 2.1111 & 2018 & 1.4355\\
+\addlinespace
+2004 & 2.3178 & 2019 & 0.9188\\
+2005 & 2.0995 & 2020 & -9.8235\\
+2006 & 4.4596 & 2021 & 8.3774\\
+2007 & 1.1156 & 2022 & 4.7678\\
+2008 & 1.0292 & 2025 & 8.0703\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para México, la tasa de crecimiento real del consumo agregado se obtuvo a partir del índice anual de consumo privado. El cálculo se realizó como la variación porcentual del nivel promedio anual del consumo real respecto al año inmediato anterior. Esta variable permite medir la expansión o contracción real del consumo agregado de los hogares en cada año.
+
+
+
+\begin{center}
+Tabla. Estados Unidos: tasa de crecimiento real anual del consumo agregado
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Crecimiento \textbackslash{}\% & Año & Crecimiento \textbackslash{}\%\\
+\midrule
+1981 & 1.3866 & 2004 & 3.77\\
+1982 & 1.4638 & 2005 & 3.5414\\
+1983 & 5.6611 & 2006 & 2.8974\\
+1984 & 5.2608 & 2007 & 2.4309\\
+1985 & 5.1775 & 2008 & 0.15\\
+\addlinespace
+1986 & 4.1281 & 2009 & -1.3055\\
+1987 & 3.3878 & 2010 & 1.9059\\
+1988 & 4.1769 & 2011 & 1.7016\\
+1989 & 2.9156 & 2012 & 1.3673\\
+1990 & 2.0141 & 2013 & 1.744\\
+\addlinespace
+1991 & 0.1805 & 2014 & 2.8303\\
+1992 & 3.6801 & 2015 & 3.3725\\
+1993 & 3.4837 & 2016 & 2.4545\\
+1994 & 3.8743 & 2017 & 2.6381\\
+1995 & 2.9505 & 2018 & 2.741\\
+\addlinespace
+1996 & 3.4699 & 2019 & 2.1473\\
+1997 & 3.7655 & 2020 & -2.5184\\
+1998 & 5.3111 & 2021 & 8.793\\
+1999 & 5.3811 & 2022 & 3.0042\\
+2000 & 5.0369 & 2023 & 2.5658\\
+\addlinespace
+2001 & 2.4764 & 2024 & 2.9481\\
+2002 & 2.5429 & 2025 & 2.6267\\
+2003 & 3.1642 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para Estados Unidos, la tasa de crecimiento real del consumo agregado se obtuvo a partir de la serie anual de \textit{Real Personal Consumption Expenditures}. El cálculo se realizó como la variación porcentual del nivel de consumo real respecto al año inmediato anterior. Esta variable resume la evolución anual del consumo agregado real de la economía estadounidense.
+
+
+
+\begin{center}
+Tabla. España: tasa de crecimiento real anual del consumo agregado
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Crecimiento \textbackslash{}\% & Año & Crecimiento \textbackslash{}\%\\
+\midrule
+1982 & 0.1920 & 2001 & 3.8785\\
+1983 & 0.4091 & 2002 & 3.0629\\
+1984 & 0.4046 & 2003 & 2.4675\\
+1985 & 2.0738 & 2004 & 4.1571\\
+1986 & 3.5435 & 2005 & 4.2906\\
+\addlinespace
+1987 & 5.9525 & 2006 & 4.1942\\
+1988 & 5.0890 & 2007 & 3.4739\\
+1989 & 5.2599 & 2008 & -0.9925\\
+1990 & 3.4780 & 2009 & -4.2758\\
+1991 & 2.7732 & 2010 & 0.3403\\
+\addlinespace
+1992 & 2.1042 & 2011 & -2.6265\\
+1993 & -2.2663 & 2012 & -3.4233\\
+1994 & 1.4439 & 2013 & -2.8706\\
+1995 & 1.1992 & 2014 & 1.6969\\
+1996 & 2.4268 & 2015 & 2.9447\\
+\addlinespace
+1997 & 2.8269 & 2016 & 2.6935\\
+1998 & 4.3504 & 2017 & 3.0355\\
+1999 & 4.7933 & 2018 & 1.7758\\
+2000 & 4.4861 & 2019 & 0.9229\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para España, la tasa de crecimiento real del consumo agregado se obtuvo a partir de la serie anual de gasto en consumo final de los hogares y de las ISFLSH a precios constantes. El cálculo se realizó como la variación porcentual del nivel de consumo real respecto al año inmediato anterior. Esta variable permite resumir la evolución anual del consumo agregado real de la economía española.
+
+
+
+\begin{center}
+Tabla. Covarianza entre el exceso de retorno y la tasa de crecimiento real del consumo agregado
+\end{center}
+\begin{center}
+
+\begin{tabular}{lc}
+\toprule
+País & Covarianza\\
+\midrule
+México & -2.630653\\
+Estados Unidos & -3.953336\\
+España & 8.083806\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para cada economía, la covarianza se obtuvo a partir de la serie anual del exceso de retorno del mercado accionario y de la tasa de crecimiento real del consumo agregado. Primero se empalmaron ambas variables por año, de modo que cada observación correspondiera al mismo periodo calendario. Posteriormente, se calculó la covarianza muestral entre ambas series, es decir, una medida de asociación lineal basada en todas las observaciones anuales disponibles en la muestra y no un promedio simple de diferencias.
+
+En términos económicos, una covarianza positiva indica que los años en que el exceso de retorno es más alto tienden a coincidir con años de mayor crecimiento real del consumo; en cambio, una covarianza negativa sugiere que ambas variables tienden a moverse en sentido opuesto. Esta estadística resume el grado en que el premio por invertir en acciones y la dinámica del consumo agregado se mueven conjuntamente a lo largo del tiempo.
+
+\newpage
+\textbf{(f) Covarianza entre el exceso de retorno y el crecimiento real del consumo de bienes durables y servicios}
+
+
+
+\begin{center}
+Tabla. México: índice anual real de consumo de bienes durables y servicios
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccccc}
+\toprule
+Año & Durables & Servicios & Año & Durables & Servicios\\
+\midrule
+1993 & 46.7338 & 54.6817 & 2009 & 59.9266 & 81.4723\\
+1994 & 48.1805 & 57.3780 & 2010 & 77.5947 & 78.1159\\
+1995 & 41.8958 & 54.6447 & 2011 & 84.6125 & 80.4154\\
+1996 & 48.0844 & 54.6143 & 2012 & 84.4389 & 83.3439\\
+1997 & 58.6582 & 58.1190 & 2013 & 85.0159 & 85.4925\\
+\addlinespace
+1998 & 63.7223 & 59.9912 & 2014 & 91.3743 & 87.1879\\
+1999 & 66.0174 & 63.7351 & 2015 & 98.1993 & 90.5976\\
+2000 & 77.3430 & 67.5145 & 2016 & 104.3765 & 93.7334\\
+2001 & 75.7109 & 69.3442 & 2017 & 99.114 & 97.2558\\
+2002 & 76.9910 & 69.1563 & 2018 & 100 & 100\\
+\addlinespace
+2003 & 75.0175 & 70.7671 & 2019 & 97.3409 & 101.75\\
+2004 & 75.8236 & 72.9818 & 2020 & 85.747 & 85.764\\
+2005 & 79.0827 & 74.0957 & 2021 & 90.3212 & 93.4409\\
+2006 & 83.3101 & 76.8490 & 2022 & 93.2866 & 101.8302\\
+2007 & 80.4611 & 79.5508 & 2025 & 107.8868 & 109.9512\\
+\addlinespace
+2008 & 79.9656 & 80.8849 &  &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Instituto Nacional de Estadística y Geografía (INEGI).}
+\end{center}
+
+
+Para México se utilizan las series anuales del Índice de volumen físico base 2018=100 del Indicador Mensual del Consumo Privado, publicadas por INEGI. En particular, se seleccionan los componentes de consumo nacional en bienes durables y en servicios, tomando el valor anual reportado para cada año. Estas series representan el nivel real anual de ambos componentes del consumo de los hogares y constituyen la base para calcular posteriormente sus tasas de crecimiento anual.
+
+
+
+\begin{center}
+Tabla. Estados Unidos: índice anual real de consumo de bienes durables y crecimiento anual real del consumo de servicios
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccccc}
+\toprule
+Año & Durables & Servicios (\%) & Año & Durables & Servicios (\%)\\
+\midrule
+1990 & 23.8442 & 2.9 & 2008 & 65.5944 & 1.8\\
+1991 & 22.5594 & 1.6 & 2009 & 61.5796 & -0.4\\
+1992 & 23.8554 & 4.0 & 2010 & 65.0168 & 1.5\\
+1993 & 25.6431 & 3.1 & 2011 & 68.3303 & 1.5\\
+1994 & 27.6879 & 3.1 & 2012 & 72.4153 & 1.0\\
+\addlinespace
+1995 & 28.7808 & 2.9 & 2013 & 76.8324 & 0.9\\
+1996 & 30.9289 & 2.9 & 2014 & 82.5023 & 2.1\\
+1997 & 33.4537 & 3.2 & 2015 & 88.8284 & 2.6\\
+1998 & 37.4944 & 4.5 & 2016 & 93.6160 & 1.9\\
+1999 & 42.3043 & 4.0 & 2017 & 99.9998 & 1.9\\
+\addlinespace
+2000 & 45.9402 & 5.0 & 2018 & 106.6074 & 2.2\\
+2001 & 48.3443 & 2.2 & 2019 & 110.1581 & 1.7\\
+2002 & 51.9062 & 1.8 & 2020 & 118.3032 & -5.8\\
+2003 & 55.6488 & 2.2 & 2021 & 137.6728 & 7.6\\
+2004 & 60.2590 & 3.0 & 2022 & 134.8954 & 4.9\\
+\addlinespace
+2005 & 63.5985 & 3.2 & 2023 & 140.0388 & 3.0\\
+2006 & 66.4100 & 2.5 & 2024 & 145.4636 & 3.0\\
+2007 & 69.5948 & 2.2 & 2025 & 150.6632 & 2.3\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos de la Federal Reserve Economic Data (FRED), Federal Reserve Bank of St. Louis.}
+\end{center}
+
+
+Para Estados Unidos se emplean dos series publicadas por FRED con información de la BEA. En el caso de los bienes durables, se utiliza la serie mensual del índice real de consumo y se construye un promedio anual para cada año. Para los servicios, se emplea directamente la tasa de crecimiento anual real reportada por la fuente. La tabla presenta ambas series para el periodo de análisis y constituye la base para la construcción posterior de las covarianzas con el exceso de retorno accionario.
+
+
+
+\begin{center}
+Tabla. España: índice anual real de consumo de bienes durables y servicios
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccccc}
+\toprule
+Año & Durables & Servicios & Año & Durables & Servicios\\
+\midrule
+1995 & 30.5790 & 45.8536 & 2011 & 15.3472 & 23.2012\\
+1996 & 23.9718 & 27.9402 & 2012 & 13.2383 & 22.3131\\
+1997 & 16.6419 & 17.7442 & 2013 & 17.6153 & 21.2786\\
+1998 & 19.3196 & 18.5302 & 2014 & 20.7422 & 23.1254\\
+1999 & 20.5833 & 19.3674 & 2015 & 23.9739 & 23.9201\\
+\addlinespace
+2000 & 17.1065 & 20.6491 & 2016 & 24.9448 & 24.6444\\
+2001 & 19.0965 & 21.2756 & 2017 & 26.2002 & 26.0223\\
+2002 & 16.3127 & 22.1098 & 2018 & 26.0914 & 25.7899\\
+2003 & 20.3474 & 21.9768 & 2019 & 25.0518 & 25.6829\\
+2004 & 23.1153 & 23.2136 & 2020 & 16.3005 & 13.4556\\
+\addlinespace
+2005 & 23.0284 & 24.0504 & 2021 & 29.2445 & 27.1652\\
+2006 & 23.9008 & 25.0526 & 2022 & 24.4508 & 29.8009\\
+2007 & 24.7549 & 25.4622 & 2023 & 28.4023 & 27.3876\\
+2008 & 20.5513 & 24.1537 & 2024 & 29.6675 & 29.3824\\
+2009 & 18.3841 & 22.4659 & 2025 & 33.8196 & 29.3902\\
+\addlinespace
+2010 & 20.2545 & 23.5420 &  &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Instituto Nacional de Estadística (INE) de España.}
+\end{center}
+
+
+Para España se utilizan las series trimestrales de gasto en consumo final interior de los hogares en bienes durables y en servicios, expresadas en términos reales dentro de la base de demanda del INE. Dado que la fuente original se encuentra en frecuencia trimestral, para este inciso se construyó una serie anual mediante el promedio de los cuatro trimestres de cada año. La tabla presenta los niveles anuales de ambos componentes y constituye la base para calcular posteriormente sus tasas de crecimiento anual.
+
+
+
+\begin{center}
+Tabla. México: crecimiento real anual del consumo de bienes durables y servicios
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccccc}
+\toprule
+Año & Durables (\%) & Servicios (\%) & Año & Durables (\%) & Servicios (\%)\\
+\midrule
+1994 & 3.0957 & 4.9309 & 2009 & -25.0595 & 0.7261\\
+1995 & -13.0440 & -4.7636 & 2010 & 29.4829 & -4.1197\\
+1996 & 14.7713 & -0.0556 & 2011 & 9.0443 & 2.9437\\
+1997 & 21.9902 & 6.4172 & 2012 & -0.2052 & 3.6417\\
+1998 & 8.6331 & 3.2213 & 2013 & 0.6833 & 2.5779\\
+\addlinespace
+1999 & 3.6017 & 6.2406 & 2014 & 7.4791 & 1.9831\\
+2000 & 17.1556 & 5.9299 & 2015 & 7.4693 & 3.9108\\
+2001 & -2.1103 & 2.7101 & 2016 & 6.2904 & 3.4612\\
+2002 & 1.6908 & -0.2709 & 2017 & -5.0418 & 3.7579\\
+2003 & -2.5633 & 2.3292 & 2018 & 0.8939 & 2.8216\\
+\addlinespace
+2004 & 1.0745 & 3.1296 & 2019 & -2.6591 & 1.7500\\
+2005 & 4.2983 & 1.5263 & 2020 & -11.9106 & -15.7110\\
+2006 & 5.3456 & 3.7157 & 2021 & 5.3346 & 8.9512\\
+2007 & -3.4198 & 3.5158 & 2022 & 3.2831 & 8.9781\\
+2008 & -0.6159 & 1.6771 & 2025 & 15.6510 & 7.9751\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+A partir de las series anuales reales de bienes durables y servicios para México, se calculó la tasa de crecimiento anual de cada componente como la variación porcentual respecto al año inmediato anterior. La tabla presenta dichas tasas de crecimiento y constituye la base para estimar posteriormente la covarianza con el exceso de retorno accionario.
+
+
+
+\begin{center}
+Tabla. Estados Unidos: crecimiento real anual del consumo de bienes durables y servicios
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccccc}
+\toprule
+Año & Durables (\%) & Servicios (\%) & Año & Durables (\%) & Servicios (\%)\\
+\midrule
+1991 & -5.3881 & 1.6 & 2009 & -6.1207 & -0.4\\
+1992 & 5.7448 & 4.0 & 2010 & 5.5817 & 1.5\\
+1993 & 7.4938 & 3.1 & 2011 & 5.0965 & 1.5\\
+1994 & 7.9742 & 3.1 & 2012 & 5.9783 & 1\\
+1995 & 3.9470 & 2.9 & 2013 & 6.0997 & 0.9\\
+\addlinespace
+1996 & 7.4639 & 2.9 & 2014 & 7.3796 & 2.1\\
+1997 & 8.1631 & 3.2 & 2015 & 7.6678 & 2.6\\
+1998 & 12.0786 & 4.5 & 2016 & 5.3897 & 1.9\\
+1999 & 12.8284 & 4.0 & 2017 & 6.8192 & 1.9\\
+2000 & 8.5945 & 5.0 & 2018 & 6.6076 & 2.2\\
+\addlinespace
+2001 & 5.2333 & 2.2 & 2019 & 3.3306 & 1.7\\
+2002 & 7.3676 & 1.8 & 2020 & 7.394 & -5.8\\
+2003 & 7.2103 & 2.2 & 2021 & 16.3729 & 7.6\\
+2004 & 8.2846 & 3.0 & 2022 & -2.0174 & 4.9\\
+2005 & 5.5419 & 3.2 & 2023 & 3.8129 & 3\\
+\addlinespace
+2006 & 4.4207 & 2.5 & 2024 & 3.8737 & 3\\
+2007 & 4.7956 & 2.2 & 2025 & 3.5745 & 2.3\\
+2008 & -5.7480 & 1.8 &  &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para Estados Unidos, el crecimiento real anual de los bienes durables se obtuvo a partir de la variación porcentual del índice anual promedio de consumo real. En el caso de los servicios, se utilizó directamente la tasa de crecimiento anual real reportada por la fuente. La tabla presenta ambas series de crecimiento para el periodo de análisis.
+
+
+
+\begin{center}
+Tabla. España: crecimiento real anual del consumo de bienes durables y servicios
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccccc}
+\toprule
+Año & Durables (\%) & Servicios (\%) & Año & Durables (\%) & Servicios (\%)\\
+\midrule
+1996 & -21.6069 & -39.0666 & 2011 & -24.2281 & -1.4476\\
+1997 & -30.5775 & -36.4923 & 2012 & -13.7412 & -3.8278\\
+1998 & 16.0905 & 4.4297 & 2013 & 33.0630 & -4.6363\\
+1999 & 6.5410 & 4.5180 & 2014 & 17.7512 & 8.6791\\
+2000 & -16.8913 & 6.6178 & 2015 & 15.5803 & 3.4368\\
+\addlinespace
+2001 & 11.6328 & 3.0340 & 2016 & 4.0496 & 3.0278\\
+2002 & -14.5775 & 3.9213 & 2017 & 5.0327 & 5.5911\\
+2003 & 24.7334 & -0.6018 & 2018 & -0.4153 & -0.8931\\
+2004 & 13.6032 & 5.6280 & 2019 & -3.9844 & -0.4149\\
+2005 & -0.3759 & 3.6047 & 2020 & -34.9326 & -47.6088\\
+\addlinespace
+2006 & 3.7882 & 4.1670 & 2021 & 79.4079 & 101.8885\\
+2007 & 3.5735 & 1.6349 & 2022 & -16.3917 & 9.7022\\
+2008 & -16.9807 & -5.1387 & 2023 & 16.1612 & -8.0978\\
+2009 & -10.5453 & -6.9881 & 2024 & 4.4544 & 7.2834\\
+2010 & 10.1737 & 4.7900 & 2025 & 13.9955 & 0.0266\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Para España, las tasas de crecimiento real anual de los bienes durables y de los servicios se calcularon a partir de las series anuales construidas con el promedio de los cuatro trimestres de cada año. La tabla resume dichas variaciones porcentuales anuales y servirá como insumo para la estimación de las covarianzas correspondientes.
+
+
+
+\begin{center}
+Tabla. Covarianza entre el exceso de retorno y la tasa de crecimiento real del consumo de bienes durables y servicios
+\end{center}
+\begin{center}
+
+\begin{tabular}{lcc}
+\toprule
+País & Covarianza durables & Covarianza servicios\\
+\midrule
+México & -12.54717 & 14.41283\\
+Estados Unidos & 18.46643 & -12.48521\\
+España & 129.45052 & -44.62240\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+A partir de las series anuales del exceso de retorno accionario y de las tasas de crecimiento real del consumo de bienes durables y de servicios, se construyeron bases empalmadas por año para cada economía. Con estas observaciones coincidentes se estimó la covarianza entre el exceso de retorno y el crecimiento real de cada componente del consumo. La tabla resume los resultados para México, Estados Unidos y España.
+
+\newpage
+\textbf{(g) Estimación del coeficiente de aversión relativa al riesgo bajo utilidad ARRC}
+
+Bajo el supuesto de una función de utilidad con aversión relativa al riesgo constante (ARRC), la diferencia entre el retorno esperado del activo riesgoso y el retorno del activo libre de riesgo puede expresarse como una función del grado de aversión relativa al riesgo y de la covarianza entre el exceso de retorno y la tasa de crecimiento del consumo. La relación relevante para este ejercicio es:
+
+\[
+E[r^m_t - r^f_t] = \theta \, \operatorname{Cov}(r^m_t - r^f_t,\; g_{c,t})
+\]
+
+donde \(r^m_t - r^f_t\) representa el exceso de retorno del mercado accionario respecto al activo libre de riesgo, \(g_{c,t}\) es la tasa de crecimiento real del consumo y \(\theta\) es el parámetro de aversión relativa al riesgo. A partir de esta expresión, el valor implícito de aversión relativa al riesgo se obtiene despejando \(\theta\):
+\[
+\theta = \frac{E[r^m_t - r^f_t]}{\operatorname{Cov}(r^m_t - r^f_t,\; g_{c,t})}
+\]
+
+En la implementación empírica de este trabajo, el término \(E[r^m_t - r^f_t]\) se aproxima mediante el promedio muestral del exceso de retorno anual, mientras que la covarianza se obtiene a partir de las series empalmadas por año para cada economía. De esta manera, el parámetro de aversión relativa al riesgo implícito se calculará como:
+\[
+\hat{\theta} = \frac{\overline{ER}}{\widehat{\operatorname{Cov}}(ER_t,\; g_{c,t})}
+\]
+
+donde \(\overline{ER}\) es el promedio del exceso de retorno y \(\widehat{\operatorname{Cov}}(ER_t,\; g_{c,t})\) es la covarianza muestral estimada entre dicha variable y el crecimiento del consumo.
+
+Este procedimiento se aplicará por separado para tres medidas de consumo: consumo agregado, consumo de bienes durables y consumo de servicios. Así, para cada país se obtendrán tres valores implícitos de aversión relativa al riesgo, lo que permitirá comparar en qué medida la desagregación del consumo modifica la magnitud del parámetro requerido para racionalizar el premio observado en el mercado accionario.
+
+En particular, para cada economía se calcularán las siguientes expresiones:
+\[
+\hat{\theta}^{agg}=
+\frac{\overline{ER}}
+{\widehat{\operatorname{Cov}}(ER_t,\; g^{agg}_{t})}
+\]
+
+\[
+\hat{\theta}^{dur}=
+\frac{\overline{ER}}
+{\widehat{\operatorname{Cov}}(ER_t,\; g^{dur}_{t})}
+\]
+
+\[
+\hat{\theta}^{serv}=
+\frac{\overline{ER}}
+{\widehat{\operatorname{Cov}}(ER_t,\; g^{serv}_{t})}
+\]
+
+donde \(g^{agg}_{t}\) es la tasa de crecimiento real del consumo agregado, \(g^{dur}_{t}\) la tasa de crecimiento real del consumo de bienes durables y \(g^{serv}_{t}\) la tasa de crecimiento real del consumo de servicios.
+
+El cálculo utilizará como numerador el promedio muestral del objeto \texttt{exceso\_retorno} para cada país. Como denominador se emplearán, según el caso, las covarianzas ya estimadas entre el exceso de retorno y el crecimiento del consumo agregado, de bienes durables y de servicios.
+
+Debe señalarse que, si la covarianza estimada es muy pequeña en magnitud, el valor implícito de \(\theta\) tenderá a ser muy elevado. Del mismo modo, si la covarianza es negativa, el parámetro obtenido puede carecer de una interpretación económica plausible bajo la versión simple del modelo. Precisamente por ello, este cálculo permite evaluar si la teoría requiere niveles razonables o excesivos de aversión relativa al riesgo para explicar el premio accionario observado.
+
+
+
+\begin{center}
+Tabla. Valor implícito de aversión relativa al riesgo bajo utilidad ARRC
+\end{center}
+\begin{center}
+
+\begin{tabular}{lccc}
+\toprule
+País & Consumo agregado & Durables & Servicios\\
+\midrule
+México & -2.356752 & -0.494119 & 0.430158\\
+Estados Unidos & -3.350636 & 0.717312 & -1.060951\\
+España & 0.579195 & 0.036169 & -0.104927\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+A partir del promedio del exceso de retorno accionario y de las covarianzas previamente estimadas con las distintas medidas del crecimiento del consumo, se obtuvo el valor implícito del parámetro de aversión relativa al riesgo para cada economía. La tabla resume dichos resultados bajo tres especificaciones: consumo agregado, consumo de bienes durables y consumo de servicios. Valores elevados de \(\hat{\theta}\) indican que el modelo requiere una alta aversión al riesgo para racionalizar el premio accionario observado.
+
+Los resultados muestran que los valores implícitos de aversión relativa al riesgo no siguen un patrón uniforme entre países ni entre componentes del consumo. En varios casos, el parámetro estimado resulta negativo, lo cual no es consistente con la interpretación económica habitual bajo utilidad ARRC, ya que implicaría una relación entre riesgo y consumo incompatible con una conducta estándar de aversión al riesgo.
+
+Para México, los valores obtenidos con consumo agregado y con bienes durables son negativos, mientras que el correspondiente a servicios es positivo pero de magnitud reducida. Esto sugiere que, para esta economía, la relación entre el exceso de retorno y el crecimiento del consumo no permite sostener de manera robusta la predicción del modelo bajo estas medidas de consumo.
+
+En Estados Unidos, el parámetro implícito es negativo con consumo agregado y con servicios, mientras que solo en el caso de bienes durables toma un valor positivo. Este resultado sugiere que el consumo de durables se acerca más a la lógica del modelo que las otras medidas, aunque el valor estimado sigue siendo pequeño y no apunta a una aversión relativa al riesgo elevada.
+
+Para España, el parámetro es positivo con consumo agregado y con bienes durables, pero negativo con servicios. No obstante, los valores positivos también son reducidos, especialmente en el caso de durables, lo que indica que la covarianza estimada entre el exceso de retorno y el crecimiento del consumo sigue siendo débil.
+
+En conjunto, los resultados sugieren que la versión simple del modelo con utilidad ARRC no explica de manera satisfactoria el premio accionario observado en las economías analizadas. Aunque la desagregación del consumo modifica los resultados, especialmente en el caso de los bienes durables, no se obtiene un patrón estable ni valores claramente plausibles de aversión relativa al riesgo.
+
+\newpage
+\textbf{(h) Covarianza entre el exceso de retorno y el crecimiento real del consumo de bienes importados en México}
+
+
+
+\begin{center}
+Tabla. México: índice de consumo privado de bienes importados, nivel anual
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Índice & Año & Índice\\
+\midrule
+1993 & 21.5364 & 2009 & 57.9504\\
+1994 & 27.6698 & 2010 & 64.933\\
+1995 & 18.1854 & 2011 & 68.5374\\
+1996 & 22.1628 & 2012 & 73.5067\\
+1997 & 29.0852 & 2013 & 81.703\\
+\addlinespace
+1998 & 33.3420 & 2014 & 84.7421\\
+1999 & 36.2514 & 2015 & 88.7542\\
+2000 & 47.9146 & 2016 & 90.6748\\
+2001 & 52.9169 & 2017 & 98.1364\\
+2002 & 56.3026 & 2018 & 100\\
+\addlinespace
+2003 & 55.7355 & 2019 & 102.7029\\
+2004 & 60.7842 & 2020 & 89.0657\\
+2005 & 64.9381 & 2021 & 115.2977\\
+2006 & 70.9067 & 2022 & 116.5949\\
+2007 & 73.0423 & 2025 & 153.0774\\
+\addlinespace
+2008 & 72.5025 &  & \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia con base en datos del Instituto Nacional de Estadística y Geografía (INEGI).}
+\end{center}
+
+
+Para el caso de México se utiliza la serie anual del índice de consumo privado de bienes importados, obtenida del tabulado del INEGI. A partir de esta información se identifica la evolución del componente importado del consumo privado en términos reales.
+
+
+
+\begin{center}
+Tabla. México: tasa de crecimiento real del índice de consumo privado de bienes importados
+\end{center}
+\begin{center}
+
+\begin{tabular}{cccc}
+\toprule
+Año & Crecimiento & Año & Crecimiento\\
+\midrule
+1994 & 28.4794 & 2009 & -20.0712\\
+1995 & -34.2773 & 2010 & 12.0492\\
+1996 & 21.8715 & 2011 & 5.5511\\
+1997 & 31.2347 & 2012 & 7.2504\\
+1998 & 14.6354 & 2013 & 11.1504\\
+\addlinespace
+1999 & 8.7260 & 2014 & 3.7197\\
+2000 & 32.1732 & 2015 & 4.7345\\
+2001 & 10.4400 & 2016 & 2.1640\\
+2002 & 6.3981 & 2017 & 8.2289\\
+2003 & -1.0073 & 2018 & 1.8990\\
+\addlinespace
+2004 & 9.0584 & 2019 & 2.7029\\
+2005 & 6.8338 & 2020 & -13.2783\\
+2006 & 9.1913 & 2021 & 29.4524\\
+2007 & 3.0119 & 2022 & 1.1251\\
+2008 & -0.7391 & 2025 & 31.2899\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+A partir de la serie anual del índice de consumo privado de bienes importados, se calcula la tasa de crecimiento real anual como la variación porcentual respecto al año inmediato anterior. Esta transformación permite contar con la variable necesaria para estimar posteriormente su covarianza con el exceso de retorno del mercado accionario mexicano.
+
+
+
+\begin{center}
+Tabla. México: covarianza entre el exceso de retorno y la tasa de crecimiento real del consumo privado de bienes importados
+\end{center}
+\begin{center}
+
+\begin{tabular}{lc}
+\toprule
+País & Covarianza\\
+\midrule
+México & 1.940573\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Una vez obtenida la tasa de crecimiento real anual del índice de consumo privado de bienes importados, esta se empalma con la serie del exceso de retorno del mercado accionario mexicano a partir del año de observación. Con ambas variables alineadas temporalmente, se calcula la covarianza muestral entre el exceso de retorno y el crecimiento real del consumo privado de bienes importados
+
+\newpage
+\textbf{(i) Aversión relativa al riesgo implícita bajo utilidad ARRC}
+
+
+
+\begin{center}
+Tabla. México: valor implícito de aversión relativa al riesgo usando consumo privado de bienes importados
+\end{center}
+\begin{center}
+
+\begin{tabular}{lc}
+\toprule
+País & Aversión relativa al riesgo\\
+\midrule
+México & 3.194829\\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Fuente: Elaboración propia.}
+\end{center}
+
+
+Con base en la covarianza estimada entre el exceso de retorno del mercado accionario mexicano y la tasa de crecimiento real del consumo privado de bienes importados, se calcula el parámetro implícito de aversión relativa al riesgo bajo el supuesto de una función de utilidad con forma ARRC. Para ello, se divide el promedio muestral del exceso de retorno entre la covarianza correspondiente. El resultado permite evaluar si esta medida alternativa del consumo genera un valor más plausible del parámetro de aversión relativa al riesgo.
+
+El valor estimado de aversión relativa al riesgo para México, usando el consumo privado de bienes importados, es 3.19. Este resultado es más plausible en términos económicos que valores extremadamente altos o negativos, ya que sugiere un grado moderado y positivo de aversión al riesgo. En este caso, la covarianza entre el exceso de retorno y el crecimiento del consumo importado permite obtener una estimación consistente con el supuesto de utilidad ARRC.
+
+\newpage
+\textbf{(j) Interpretación y conclusiones}
+
+Los resultados obtenidos muestran que la relación entre el exceso de retorno accionario y el crecimiento del consumo es débil e inestable entre países (México, EE.UU. y España) y entre medidas de consumo. En la estimación con utilidad ARRC, varios parámetros implícitos de aversión relativa al riesgo resultan negativos: para México ocurre con consumo agregado y durables; para Estados Unidos con consumo agregado y servicios; y para España con servicios. Además, aún cuando algunos valores son positivos, varios son muy reducidos, como en España con durables. Esto sugiere que, bajo estas especificaciones, la covarianza entre retornos y consumo no sigue un patrón robusto que permita racionalizar de manera satisfactoria el premio accionario observado.
+
+En el caso de México, el contraste entre medidas de consumo es particularmente claro. Con consumo agregado y con bienes durables, el parámetro implícito de aversión relativa al riesgo es negativo, mientras que con servicios apenas alcanza un valor positivo pequeño. En cambio, al utilizar el crecimiento del consumo privado de bienes importados, la covarianza estimada es positiva y el valor implícito de aversión relativa al riesgo asciende a 3.2 aproximadamente. A diferencia de los resultados anteriores, este valor sí es económicamente plausible y sugiere un grado moderado de aversión al riesgo.
+
+La evidencia indica que la versión simple del modelo con utilidad ARRC no explica adecuadamente el acertijo del premio al riesgo cuando se emplean medidas agregadas del consumo o varias de sus desagregaciones usuales. El consumo agregado observado no comueve lo suficiente con los retornos accionarios como para justificar el alto premio accionario con niveles razonables de aversión al riesgo. Sin embargo, el caso de los bienes importados en México sugiere que ciertas medidas más sensibles al ciclo económico y a las fluctuaciones del gasto pueden aproximarse mejor a la lógica del modelo. Por ello, los resultados apuntan a que la forma en que se mide el consumo es crucial para evaluar la plausibilidad empírica del parámetro de aversión relativa al riesgo.
+
+
+\newpage
+{\large\bfseries Ejercicio 8. Método del árbol binomial en dos etapas: explicar el precio de un activo y valuación de un ``call'' sobre dicho activo}
+\vspace{0.2cm}
+
+En este inciso se aplicará el método del árbol binomial en dos etapas para representar la evolución posible del precio de un activo. Primero, se construirá el árbol del activo, mostrando los movimientos posibles al alza y a la baja en cada periodo, de modo que quede descrita la dinámica del precio en dos etapas. Después, con base en ese mismo árbol, se valuará una opción call, utilizando una tasa de interés del cinco por ciento.
+
+Una vez definido el árbol, el valor de la opción se obtendrá calculando sus pagos posibles al vencimiento y trayéndolos hacia atrás mediante el procedimiento de valuación neutral al riesgo. El propósito de esta sección es mostrar, de forma ordenada, cómo el modelo binomial permite pasar de la representación de precios futuros posibles a la determinación del valor actual de una opción de compra.
+\vspace{0.3cm}
+
+\textbf{(a) Utilice el método del árbol binomial en dos etapas para, primero, explicar el precio \(P = 200\) de un activo y, después, valuar un ``call'' sobre dicho activo, con precio de ejercicio \(K=P-N*5\) donde N es el número de su equipo, (Eq. 1: use N=1, Eq. 2: use N=2, etc.) asumiendo una tasa de interés de 5 por ciento.}
+
+Para el equipo 3 se tiene \(N=3\), por lo que el precio de ejercicio del call es:
+\[
+K=P-N\cdot 5=200-3\cdot 5=185
+\]
+
+Además, la tasa de interés libre de riesgo es:
+\[
+r=0.05,
+\qquad R=1+r=1.05
+\]
+
+Se construye un árbol binomial recombinante de dos etapas con factores de alza y baja:
+\[
+u=1.2,
+\qquad d=0.9
+\]
+
+Esta elección satisface la condición de no arbitraje:
+\[
+d<R<u,
+\qquad 0.9 < 1.05 < 1.2
+\]
+
+Partiendo de \(P_0=200\), el árbol de precios del activo queda de la siguiente forma:
+\[
+P_u=200 (1.2)=240,
+\qquad
+P_d=200 (0.9)=180,
+\]
+y en la segunda etapa:
+\[
+P_{uu}=240 (1.2)=288,
+\qquad
+P_{ud}=P_{du}=240 (0.9)=180 (1.2)=216,
+\qquad
+P_{dd}=180 (0.9)=162
+\]
+
+La probabilidad neutral al riesgo se obtiene con:
+\[
+q=\frac{R-d}{u-d}
+=\frac{1.05-0.9}{1.2-0.9}
+=\frac{0.15}{0.30}=0.5
+\]
+
+Así, se verifica que el precio actual del activo es consistente con la ecuación fundamental de valuación:
+\[
+P_0=\frac{qP_u+(1-q)P_d}{R}
+=\frac{0.5(240)+0.5(180)}{1.05}
+=\frac{210}{1.05}=200
+\]
+
+El valor actual del activo queda explicado como el valor presente de su precio esperado bajo la medida neutral al riesgo. Ahora se procede a valuar el call. En los nodos terminales, el pago de la opción está dado por:
+\[
+C_T=\max(P_T-K,0)
+\]
+
+Por lo tanto:
+\[
+C_{uu}=\max (288-185,0)=103,
+\]
+\[
+C_{ud}=\max (216-185,0)=31,
+\]
+\[
+C_{dd}=\max (162-185,0)=0
+\]
+
+A continuación se hace inducción hacia atrás. En el nodo alto del periodo 1:
+\[
+C_u=\frac{qC_{uu}+(1-q)C_{ud}}{R}
+=\frac{0.5(103)+0.5(31)}{1.05}
+=\frac{67}{1.05}=63.81
+\]
+
+En el nodo bajo del periodo 1:
+\[
+C_d=\frac{qC_{ud}+(1-q)C_{dd}}{R}=\frac{0.5(31)+0.5(0)}{1.05}=\frac{15.5}{1.05}=14.76
+\]
+
+Finalmente, el valor actual del call es:
+\[
+C_0=\frac{qC_u+(1-q)C_d}{R}
+=\frac{0.5(63.81)+0.5(14.76)}{1.05}
+\approx 37.41
+\]
+
+Por consiguiente, el valor del call en \(t=0\) es:
+\[
+\boxed{C_0\approx 37.41}
+\]
+
+El método del árbol binomial en dos etapas permite racionalizar el precio actual del activo mediante probabilidades neutrales al riesgo y, después, aplicar la misma lógica de descuento al flujo contingente de la opción. Bajo los supuestos mencionados, el activo vale \(200\) y el call con precio de ejercicio \(185\) vale \(37.4\) aproximadamente.
+
+
+
+\end{document}
